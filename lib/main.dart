@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:network_info_plus/network_info_plus.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
@@ -9,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'post_model.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const RabahDjLocalApp());
 }
 
@@ -51,13 +51,33 @@ class _LocalHomePageState extends State<LocalHomePage> {
     _getWifiIp();
   }
 
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    _contentCtrl.dispose();
+    _ipServerCtrl.dispose();
+    _localServer?.close();
+    super.dispose();
+  }
+
+  // طريقة احترافية لجلب الـ IP المحلي بدون أي مكتبات خارجية تسبب مشاكل بناء
   Future<void> _getWifiIp() async {
-    final info = NetworkInfo();
-    String? wifiIp = await info.getWifiIP();
-    setState(() {
-      _myIpAddress = wifiIp ?? "غير متصل بـ Wi-Fi";
-      _ipServerCtrl.text = _myIpAddress;
-    });
+    try {
+      for (var interface in await NetworkInterface.list()) {
+        for (var addr in interface.addresses) {
+          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
+            setState(() {
+              _myIpAddress = addr.address;
+              _ipServerCtrl.text = _myIpAddress;
+            });
+            return;
+          }
+        }
+      }
+      setState(() => _myIpAddress = "127.0.0.1");
+    } catch (e) {
+      setState(() => _myIpAddress = "تعذر جلب الـ IP");
+    }
   }
 
   void _startLocalServer() async {
@@ -87,10 +107,14 @@ class _LocalHomePageState extends State<LocalHomePage> {
       return shelf.Response.ok(jsonEncode({'status': 'liked'}));
     });
 
-    _localServer = await shelf_io.serve(appRouter, InternetAddress.anyIPv4, 8080);
-    setState(() {
-      _isServerRunning = true;
-    });
+    try {
+      _localServer = await shelf_io.serve(appRouter, InternetAddress.anyIPv4, 8080);
+      setState(() {
+        _isServerRunning = true;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل تشغيل السيرفر: $e")));
+    }
   }
 
   Future<void> _refreshNetworkPosts() async {
@@ -160,77 +184,81 @@ class _LocalHomePageState extends State<LocalHomePage> {
           IconButton(icon: const Icon(Icons.refresh, color: Colors.cyanAccent), onPressed: _refreshNetworkPosts)
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            color: const Color(0xFF1E1E1E),
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Text("IP الخاص بك: $_myIpAddress", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _ipServerCtrl,
-                        decoration: const InputDecoration(hintText: "أدخل IP المضيف", border: OutlineInputBorder(), isDense: true),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _isServerRunning ? null : _startLocalServer,
-                      style: ElevatedButton.styleFrom(backgroundColor: _isServerRunning ? Colors.green : Colors.blueGrey),
-                      child: Text(_isServerRunning ? "أنت المضيف 🟢" : "اجعلني المضيف 📡"),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              children: [
-                TextField(controller: _usernameCtrl, decoration: const InputDecoration(hintText: "اسمك المستعار", prefixIcon: Icon(Icons.person))),
-                const SizedBox(height: 8),
-                TextField(controller: _contentCtrl, decoration: const InputDecoration(hintText: "اكتب رسالة للشبكة... 💬", prefixIcon: Icon(Icons.wifi))),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _sendPostToNetwork,
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
-                    child: const Text("بث في الشبكة 🚀", style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          Expanded(
-            child: _localPosts.isEmpty
-                ? const Center(child: Text("اضغط على زر التحديث 🔄 لجلب منشورات الشبكة!"))
-                : ListView.builder(
-                    itemCount: _localPosts.length,
-                    itemBuilder: (context, i) {
-                      final post = _localPosts[i];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        child: ListTile(
-                          title: Text("@${post.username}", style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
-                          subtitle: Text(post.content),
-                          trailing: TextButton.icon(
-                            icon: const Icon(Icons.favorite, color: Colors.red),
-                            label: Text("${post.likes}"),
-                            onPressed: () => _sendLike(post.id),
-                          ),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: [
+            Container(
+              color: const Color(0xFF1E1E1E),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  Text("IP الخاص بك: $_myIpAddress", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _ipServerCtrl,
+                          decoration: const InputDecoration(hintText: "أدخل IP المضيف", border: OutlineInputBorder(), isDense: true),
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _isServerRunning ? null : _startLocalServer,
+                        style: ElevatedButton.styleFrom(backgroundColor: _isServerRunning ? Colors.green : Colors.blueGrey),
+                        child: Text(_isServerRunning ? "أنت المضيف 🟢" : "اجعلني المضيف 📡"),
+                      ),
+                    ],
                   ),
-          ),
-        ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                children: [
+                  TextField(controller: _usernameCtrl, decoration: const InputDecoration(hintText: "اسمك المستعار", prefixIcon: Icon(Icons.person))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _contentCtrl, decoration: const InputDecoration(hintText: "اكتب رسالة للشبكة... 💬", prefixIcon: Icon(Icons.wifi))),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 45,
+                    child: ElevatedButton(
+                      onPressed: _sendPostToNetwork,
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
+                      child: const Text("بث في الشبكة 🚀", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            Expanded(
+              child: _localPosts.isEmpty
+                  ? const Center(child: Text("اضغط على زر التحديث 🔄 لجلب منشورات الشبكة!"))
+                  : ListView.builder(
+                      itemCount: _localPosts.length,
+                      itemBuilder: (context, i) {
+                        final post = _localPosts[i];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          child: ListTile(
+                            title: Text("@${post.username}", style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                            subtitle: Text(post.content),
+                            trailing: TextButton.icon(
+                              icon: const Icon(Icons.favorite, color: Colors.red),
+                              label: Text("${post.likes}"),
+                              onPressed: () => _sendLike(post.id),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
