@@ -286,7 +286,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.all(Radius.circular(10))))),
+                  // تم إزالة كلمة const من هنا لحل مشكلة البناء بنجاح
+                  Center(child: Container(width: 40, height: 4, decoration: const BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.all(Radius.circular(10))))),
                   const SizedBox(height: 10),
                   const Text("التعليقات", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const Divider(),
@@ -501,3 +502,4 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     );
   }
 }
+
