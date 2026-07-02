@@ -227,7 +227,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         _ipServerCtrl.text = _myIpAddress;
       });
       _startUdpBroadcast();
-      _showNotification("تم تفعيل السيرفر وبث الشبكة بنجاح! 📡", Icons.g_rounded);
+      // تم هنا استبدال الأيقونة غير الموجودة بأيقونة Icons.router المدعومة والممتازة
+      _showNotification("تم تفعيل السيرفر وبث الشبكة بنجاح! 📡", Icons.router);
     } catch (e) {
       print(e);
     }
