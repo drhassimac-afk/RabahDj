@@ -51,7 +51,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   final _usernameCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
   final _imageCtrl = TextEditingController();
-  final _videoCtrl = TextEditingController(); // متحكم رابط الفيديو والريلز
+  final _videoCtrl = TextEditingController(); 
   final _ipServerCtrl = TextEditingController();
 
   String _myIpAddress = "جاري جلب الـ IP...";
@@ -283,7 +283,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       setState(() => _posts.insert(0, newPost));
       _savePostsToLocal();
       _showNotification("تم النشر بنجاح! ✅", Icons.check_circle);
-    } catch (_) {
+    } else {
       try {
         await http.post(Uri.parse('http://$targetIp:8080/add_post'), body: newPost.toJson());
       } catch (_) {}
@@ -331,7 +331,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.pink.shade50, foregroundColor: Colors.pink),
                   ),
                   ElevatedButton.icon(
-                    onPressed: () => _sendMediaPost('story',),
+                    onPressed: () => _sendMediaPost('story'),
                     icon: const Icon(Icons.history_toggle_off),
                     label: const Text("قصة"),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade50, foregroundColor: Colors.amber.shade900),
@@ -463,10 +463,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         body: TabBarView(
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            // قسم الأخبار والقصص
             Column(
               children: [
-                // حالة الاتصال والسيرفر
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -485,7 +483,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                     ],
                   ),
                 ),
-                // شريط القصص (Stories)
                 if (storiesList.isNotEmpty)
                   Container(
                     height: 100,
@@ -511,7 +508,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                       },
                     ),
                   ),
-                // قائمة المنشورات التقليدية
                 Expanded(
                   child: feedsList.isEmpty
                       ? const Center(child: Text("لا توجد منشورات نصية أو صور حالياً"))
@@ -535,7 +531,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                     children: [
-                                      TextButton.icon(onPressed: () { setState(() { post.likes++; }); }, icon: const Icon(Icons.thumb_up_out_allowed), label: Text("إعجاب (${post.likes})")),
+                                      // تصحيح الأيقونة هنا
+                                      TextButton.icon(onPressed: () { setState(() { post.likes++; }); }, icon: const Icon(Icons.thumb_up_outlined), label: Text("إعجاب (${post.likes})")),
                                       TextButton.icon(onPressed: () => _showCommentsSheet(post), icon: const Icon(Icons.comment), label: Text("تعليق (${post.comments.length})")),
                                     ],
                                   )
@@ -547,7 +544,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                 ),
               ],
             ),
-            // قسم الريلز المطور (Reels View)
             reelsList.isEmpty
                 ? const Center(child: Text("لا توجد مقاطع ريلز منشورة حالياً 🎬"))
                 : PageView.builder(
@@ -576,7 +572,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                             right: 16,
                             child: Column(
                               children: [
-                                IconButton(icon: const Icon(Icons.favorite, color: Colors.reduce), onPressed: () { setState(() { reel.likes++; }); }),
+                                // تصحيح اللون هنا إلى الألوان المدعومة افتراضياً
+                                IconButton(icon: const Icon(Icons.favorite, color: Colors.red), onPressed: () { setState(() { reel.likes++; }); }),
                                 Text("${reel.likes}", style: const TextStyle(color: Colors.white)),
                                 const SizedBox(height: 16),
                                 IconButton(icon: const Icon(Icons.comment, color: Colors.white), onPressed: () => _showCommentsSheet(reel)),
@@ -595,7 +592,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   }
 }
 
-// عنصر مشغل الفيديو المخصص للشبكة المحلية
 class LocalVideoWidget extends StatefulWidget {
   final String videoUrl;
   const LocalVideoWidget({super.key, required this.videoUrl});
@@ -659,4 +655,5 @@ class _LocalVideoWidgetState extends State<LocalVideoWidget> {
     );
   }
 }
+
 
