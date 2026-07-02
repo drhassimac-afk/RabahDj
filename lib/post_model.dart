@@ -35,7 +35,7 @@ class PostModel {
   final String? imageUrl;
   int likes;
   final DateTime dateTime;
-  List<CommentModel> comments; // ميزة التعليقات الجديدة
+  List<CommentModel> comments;
 
   PostModel({
     required this.id,
