@@ -31,12 +31,6 @@ class RabahDjFacebookApp extends StatelessWidget {
           secondary: Color(0xFF42B72A),
           surface: Colors.white,
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          elevation: 1,
-          iconTheme: IconThemeData(color: Colors.black87),
-          titleTextStyle: TextStyle(color: Color(0xFF1877F2), fontSize: 24, fontWeight: FontWeight.bold),
-        ),
       ),
       home: const FacebookHomePage(),
     );
@@ -62,10 +56,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   HttpServer? _localServer;
   Timer? _autoRefreshTimer;
   
-  // متغيرات ميزة الاكتشاف التلقائي الذكية (UDP)
   RawDatagramSocket? _udpSocket;
   Timer? _udpBroadcastTimer;
-  bool _isSearchingHost = false;
 
   @override
   void initState() {
@@ -74,7 +66,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _silentRefreshPosts();
     });
-    // بدء الاستماع التلقائي لأي سيرفر في الشبكة بمجرد فتح التطبيق
     _startListeningForHosts();
   }
 
@@ -96,9 +87,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       for (var interface in await NetworkInterface.list()) {
         for (var addr in interface.addresses) {
           if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-            setState(() {
-              _myIpAddress = addr.address;
-            });
+            setState(() => _myIpAddress = addr.address);
             return;
           }
         }
@@ -109,7 +98,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     }
   }
 
-  // 📡 المضيف: تشغيل السيرفر وبث الـ IP في الأجواء تلقائياً
   void _startLocalServer() async {
     final appRouter = shelf_router.Router();
 
@@ -120,9 +108,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
 
     appRouter.post('/add_post', (shelf.Request request) async {
       final payload = await request.readAsString();
-      final data = jsonDecode(payload);
       setState(() {
-        _posts.insert(0, PostModel.fromMap(data));
+        _posts.insert(0, PostModel.fromMap(jsonDecode(payload)));
       });
       return shelf.Response.ok(jsonEncode({'status': 'success'}));
     });
@@ -137,41 +124,48 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       return shelf.Response.ok(jsonEncode({'status': 'liked'}));
     });
 
+    // نقطة اتصال برمجية جديدة لاستقبال التعليقات عبر الشبكة
+    appRouter.post('/add_comment', (shelf.Request request) async {
+      final payload = await request.readAsString();
+      final data = jsonDecode(payload);
+      final postId = data['postId'];
+      final commentData = data['comment'];
+
+      setState(() {
+        final index = _posts.indexWhere((p) => p.id == postId);
+        if (index != -1) {
+          _posts[index].comments.add(CommentModel.fromMap(commentData));
+        }
+      });
+      return shelf.Response.ok(jsonEncode({'status': 'comment_added'}));
+    });
+
     try {
       _localServer = await shelf_io.serve(appRouter, InternetAddress.anyIPv4, 8080);
       setState(() {
         _isServerRunning = true;
         _ipServerCtrl.text = _myIpAddress;
       });
-      
-      // تشغيل البث الذكي التلقائي للـ IP عبر الشبكة
       _startUdpBroadcast();
     } catch (e) {
       print(e);
     }
   }
 
-  // 🎇 دالة البث التلقائي (تخبر الأجهزة الأخرى بمكان السيرفر)
   void _startUdpBroadcast() async {
     try {
       _udpSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
       _udpSocket?.broadcastEnabled = true;
-
       _udpBroadcastTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-        final String message = "RABAH_DJ_HOST:$_myIpAddress";
-        final List<int> dataToSend = utf8.encode(message);
-        // إرسال الإشارة لجميع الأجهزة في الشبكة المحلية عبر الـ Broadcast IP
-        _udpSocket?.send(dataToSend, InternetAddress('255.255.255.255'), 8888);
+        _udpSocket?.send(utf8.encode("RABAH_DJ_HOST:$_myIpAddress"), InternetAddress('255.255.255.255'), 8888);
       });
     } catch (e) {
-      print("خطأ في بث UDP: $e");
+      print(e);
     }
   }
 
-  // 🔍 العميل: الاستماع واكتشاف السيرفر تلقائياً دون كتابة يدوية
   void _startListeningForHosts() async {
     try {
-      setState(() => _isSearchingHost = true);
       final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 8888);
       socket.listen((RawSocketEvent event) {
         if (event == RawSocketEvent.read) {
@@ -180,19 +174,15 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
             final String msg = utf8.decode(dg.data);
             if (msg.startsWith("RABAH_DJ_HOST:")) {
               final detectedIp = msg.split(":")[1];
-              // إذا التقط التطبيق سيرفر نشط ولم يكن المستخدم هو المضيف نفسه، يربطه تلقائياً!
               if (!_isServerRunning && _ipServerCtrl.text != detectedIp) {
-                setState(() {
-                  _ipServerCtrl.text = detectedIp;
-                  _isSearchingHost = false;
-                });
+                setState(() => _ipServerCtrl.text = detectedIp);
               }
             }
           }
         }
       });
     } catch (e) {
-      print("خطأ في استقبال UDP: $e");
+      print(e);
     }
   }
 
@@ -225,12 +215,11 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       imageUrl: imgUrl.isEmpty ? null : imgUrl,
       likes: 0,
       dateTime: DateTime.now(),
+      comments: [],
     );
 
     if (_isServerRunning && targetIp == _myIpAddress) {
-      setState(() {
-        _posts.insert(0, newPost);
-      });
+      setState(() => _posts.insert(0, newPost));
     } else {
       try {
         await http.post(Uri.parse('http://$targetIp:8080/add_post'), body: newPost.toJson());
@@ -255,6 +244,114 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     }
   }
 
+  // دالة إرسال تعليق جديد عبر الشبكة
+  Future<void> _sendComment(String postId, String text) async {
+    final targetIp = _ipServerCtrl.text.trim();
+    final user = _usernameCtrl.text.trim().isEmpty ? "مستخدم فيسبوك" : _usernameCtrl.text.trim();
+    
+    if (text.trim().isEmpty || targetIp.isEmpty) return;
+
+    final commentObj = CommentModel(username: user, text: text, dateTime: DateTime.now());
+
+    if (_isServerRunning && targetIp == _myIpAddress) {
+      setState(() {
+        final index = _posts.indexWhere((p) => p.id == postId);
+        if (index != -1) _posts[index].comments.add(commentObj);
+      });
+    } else {
+      try {
+        await http.post(
+          Uri.parse('http://$targetIp:8080/add_comment'),
+          body: jsonEncode({
+            'postId': postId,
+            'comment': commentObj.toMap(),
+          }),
+        );
+      } catch (e) {
+        print(e);
+      }
+    }
+    _silentRefreshPosts();
+  }
+
+  // نافذة التعليقات السفلية الأنيقة (Facebook Comments Sheet)
+  void _showCommentsSheet(PostModel post) {
+    final commentInputCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, top: 12, left: 12, right: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.all(Radius.circular(10))))),
+                  const SizedBox(height: 10),
+                  const Text("التعليقات", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Divider(),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 250),
+                    child: post.comments.isEmpty
+                        ? const Padding(padding: EdgeInsets.all(20.0), child: Center(child: Text("لا توجد تعليقات بعد، كن أول من يعلق!")))
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: post.comments.length,
+                            itemBuilder: (context, index) {
+                              final comment = post.comments[index];
+                              return Container(
+                                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.all(8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(comment.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1877F2))),
+                                    const SizedBox(height: 2),
+                                    Text(comment.text, style: const TextStyle(fontSize: 14)),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  const Divider(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: commentInputCtrl,
+                          decoration: const InputDecoration(hintText: "اكتب تعليقاً...", border: InputBorder.none),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.send, color: Color(0xFF1877F2)),
+                        onPressed: () async {
+                          if (commentInputCtrl.text.trim().isNotEmpty) {
+                            await _sendComment(post.id, commentInputCtrl.text);
+                            setSheetState(() {
+                              commentInputCtrl.clear();
+                            });
+                            // تحديث الصفحة الرئيسية أيضاً لمعاينة التغيير
+                            setState(() {});
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -272,49 +369,31 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
-            // شريط شبكي ذكي ومطور يعرض حالة الاتصال والبحث التلقائي
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
-                  Icon(
-                    _isServerRunning ? Icons.radio_button_checked : Icons.radar_rounded,
-                    size: 18,
-                    color: _isServerRunning ? Colors.green : Colors.orange,
-                  ),
+                  Icon(_isServerRunning ? Icons.radio_button_checked : Icons.radar_rounded, size: 18, color: _isServerRunning ? Colors.green : Colors.orange),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       _isServerRunning 
                         ? "أنت المضيف النشط على شبكة الـ Wi-Fi" 
-                        : (_ipServerCtrl.text.isNotEmpty 
-                            ? "متصل تلقائياً بالمضيف: ${_ipServerCtrl.text}" 
-                            : "جاري البحث التلقائي عن أصدقائك بالشبكة... 🔍"),
+                        : (_ipServerCtrl.text.isNotEmpty ? "متصل تلقائياً بالمضيف: ${_ipServerCtrl.text}" : "جاري البحث التلقائي عن أصدقائك... 🔍"),
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
                     ),
                   ),
                   if (!_isServerRunning && _ipServerCtrl.text.isEmpty)
-                    const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-                  if (!_isServerRunning && _ipServerCtrl.text.isNotEmpty)
-                    const Text("🟢 نشط", style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
-                  if (!_isServerRunning && _ipServerCtrl.text.isEmpty)
                     ElevatedButton(
                       onPressed: _startLocalServer,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade50,
-                        foregroundColor: Colors.blue,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                      ),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade50, foregroundColor: Colors.blue, elevation: 0),
                       child: const Text("ابدأ بث 📡", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                 ],
               ),
             ),
             const SizedBox(height: 8),
-
-            // صندوق النشر الفيسلوكي المحترف
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(12),
@@ -328,24 +407,13 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: TextField(
-                          controller: _usernameCtrl,
-                          decoration: const InputDecoration(hintText: "اسمك الشخصي...", border: InputBorder.none),
-                        ),
+                        child: TextField(controller: _usernameCtrl, decoration: const InputDecoration(hintText: "اسمك الشخصي...", border: InputBorder.none)),
                       ),
                     ],
                   ),
                   const Divider(height: 20, color: Color(0xFFE4E6EB)),
-                  TextField(
-                    controller: _contentCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(hintText: "بماذا تفكر الآن؟", border: InputBorder.none),
-                  ),
-                  TextField(
-                    controller: _imageCtrl,
-                    style: const TextStyle(fontSize: 12, color: Colors.blue),
-                    decoration: const InputDecoration(hintText: "رابط صورة للمنشور (اختياري) 🖼️", border: InputBorder.none, isDense: true),
-                  ),
+                  TextField(controller: _contentCtrl, maxLines: 2, decoration: const InputDecoration(hintText: "بماذا تفكر الآن؟", border: InputBorder.none)),
+                  TextField(controller: _imageCtrl, style: const TextStyle(fontSize: 12, color: Colors.blue), decoration: const InputDecoration(hintText: "رابط صورة للمنشور (اختياري) 🖼️", border: InputBorder.none, isDense: true)),
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
@@ -359,8 +427,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                 ],
               ),
             ),
-
-            // الخلاصة الإخبارية (News Feed)
             Expanded(
               child: _posts.isEmpty
                   ? Center(
@@ -371,7 +437,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                           const SizedBox(height: 8),
                           Text("لا توجد منشورات في شبكة الـ Wi-Fi حالياً", style: TextStyle(color: Colors.grey.shade500)),
                         ],
-                      )
+                      ),
                     )
                   : ListView.builder(
                       itemCount: _posts.length,
@@ -406,26 +472,24 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                               if (post.imageUrl != null)
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    post.imageUrl!,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    errorBuilder: (context, error, stackTrace) => Container(
-                                      height: 100,
-                                      color: Colors.grey.shade100,
-                                      child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
-                                    ),
-                                  ),
+                                  child: Image.network(post.imageUrl!, fit: BoxFit.cover, width: double.infinity),
                                 ),
                               const Divider(height: 24, color: Color(0xFFE4E6EB)),
+                              // شريط أزرار التفاعل المطور (إعجاب وتعليق)
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Expanded(
                                     child: TextButton.icon(
                                       onPressed: () => _sendLike(post.id),
                                       icon: const Icon(Icons.thumb_up_alt_outlined, size: 20),
                                       label: Text("إعجاب (${post.likes})", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: TextButton.icon(
+                                      onPressed: () => _showCommentsSheet(post),
+                                      icon: const Icon(Icons.mode_comment_outlined, size: 20),
+                                      label: Text("تعليق (${post.comments.length})", style: const TextStyle(fontWeight: FontWeight.bold)),
                                     ),
                                   ),
                                 ],
