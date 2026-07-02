@@ -13,6 +13,7 @@ dependencies:
   shelf: ^1.4.1
   shelf_router: ^1.1.4
   http: ^1.2.0
+  shared_preferences: ^2.2.0 # مكتبة التخزي
 
 flutter:
   uses-material-design: true
