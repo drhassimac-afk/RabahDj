@@ -33,6 +33,8 @@ class PostModel {
   final String username;
   final String content;
   final String? imageUrl;
+  final String? videoUrl; // رابط الفيديو أو الريلز
+  final String type; // 'post' أو 'reels' أو 'story'
   int likes;
   final DateTime dateTime;
   List<CommentModel> comments;
@@ -42,6 +44,8 @@ class PostModel {
     required this.username,
     required this.content,
     this.imageUrl,
+    this.videoUrl,
+    required this.type,
     required this.likes,
     required this.dateTime,
     required this.comments,
@@ -53,6 +57,8 @@ class PostModel {
       'username': username,
       'content': content,
       'imageUrl': imageUrl,
+      'videoUrl': videoUrl,
+      'type': type,
       'likes': likes,
       'dateTime': dateTime.toIso8601String(),
       'comments': comments.map((c) => c.toMap()).toList(),
@@ -66,6 +72,8 @@ class PostModel {
       username: map['username'] ?? 'RabahDj User',
       content: map['content'] ?? '',
       imageUrl: map['imageUrl'],
+      videoUrl: map['videoUrl'],
+      type: map['type'] ?? 'post',
       likes: map['likes'] ?? 0,
       dateTime: DateTime.parse(map['dateTime'] ?? DateTime.now().toIso8601String()),
       comments: commentsList.map((c) => CommentModel.fromMap(c)).toList(),
