@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:shelf_router/shelf_router.dart';
+import 'package:shelf_router/shelf_router.dart' as shelf_router; // تعديل ذكي لمنع التداخل
 import 'package:http/http.dart' as http;
 import 'post_model.dart';
 
@@ -60,7 +60,6 @@ class _LocalHomePageState extends State<LocalHomePage> {
     super.dispose();
   }
 
-  // طريقة احترافية لجلب الـ IP المحلي بدون أي مكتبات خارجية تسبب مشاكل بناء
   Future<void> _getWifiIp() async {
     try {
       for (var interface in await NetworkInterface.list()) {
@@ -81,7 +80,7 @@ class _LocalHomePageState extends State<LocalHomePage> {
   }
 
   void _startLocalServer() async {
-    final appRouter = Router();
+    final appRouter = shelf_router.Router(); // تم حل التداخل هنا بنجاح
 
     appRouter.get('/posts', (shelf.Request request) {
       final jsonList = _localPosts.map((p) => p.toMap()).toList();
@@ -200,7 +199,7 @@ class _LocalHomePageState extends State<LocalHomePage> {
                       Expanded(
                         child: TextField(
                           controller: _ipServerCtrl,
-                          decoration: const InputDecoration(hintText: "أدخل IP المضيف", border: OutlineInputBorder(), isDense: true),
+                          decoration: const InputDecoration(hintText: "أدخل IP Mofid", border: OutlineInputBorder(), isDense: true),
                         ),
                       ),
                       const SizedBox(width: 8),
