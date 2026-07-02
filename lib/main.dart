@@ -21,15 +21,14 @@ class RabahDjFacebookApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Facebook Local',
-      // ثيم فيسبوك الأزرق العصري والمريح
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        primaryColor: const Color(0xFF1877F2), // أزرق فيسبوك الرسمي
-        scaffoldBackgroundColor: const Color(0xFFF0F2F5), // لون الخلفية الرمادي الفاتح المريح
+        primaryColor: const Color(0xFF1877F2),
+        scaffoldBackgroundColor: const Color(0xFFF0F2F5),
         colorScheme: const ColorScheme.light(
           primary: Color(0xFF1877F2),
-          secondary: Color(0xFF42B72A), // أخضر فيسبوك لعمليات النشر
+          secondary: Color(0xFF42B72A),
           surface: Colors.white,
         ),
         appBarTheme: const AppBarTheme(
@@ -55,19 +54,18 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   List<PostModel> _posts = [];
   final _usernameCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
-  final _imageCtrl = TextEditingController(); // حقل اختياري لإضافة رابط صورة
+  final _imageCtrl = TextEditingController();
   final _ipServerCtrl = TextEditingController();
 
   String _myIpAddress = "جاري جلب الـ IP...";
   bool _isServerRunning = false;
   HttpServer? _localServer;
-  Timer? _autoRefreshTimer; // ميزة التحديث التلقائي بدون تدخل المستخدم
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _getWifiIp();
-    // تفعيل التحديث التلقائي الصامت كل ثانيتين لجلب المنشورات الجديدة فوراً
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _silentRefreshPosts();
     });
@@ -140,7 +138,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     }
   }
 
-  // تحديث صامت خلف الكواليس لضمان انسيابية التطبيق مثل فيسبوك الحقيقي
   Future<void> _silentRefreshPosts() async {
     final targetIp = _ipServerCtrl.text.trim();
     if (targetIp.isEmpty) return;
@@ -208,7 +205,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         elevation: 1,
         actions: [
           IconButton(
-            icon: Icon(_isServerRunning ? Icons.g_network_left_sharp : Icons.wifi_off, color: _isServerRunning ? Colors.green : Colors.grey),
+            // تم تصحيح الأيقونة هنا لتكون معتمدة ورسمية
+            icon: Icon(_isServerRunning ? Icons.wifi : Icons.wifi_off, color: _isServerRunning ? Colors.green : Colors.grey),
             onPressed: _getWifiIp,
           )
         ],
@@ -217,7 +215,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
-            // لوحة إعدادات الاتصال (مخفية بشكل أنيق كشريط علوي)
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -243,8 +240,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
               ),
             ),
             const SizedBox(height: 8),
-
-            // صندوق إنشاء منشورات مثل فيسبوك الحقيقي تماماً
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(12),
@@ -289,8 +284,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                 ],
               ),
             ),
-
-            // عرض خلاصة الأخبار (News Feed)
             Expanded(
               child: _posts.isEmpty
                   ? Center(
@@ -333,8 +326,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                               const SizedBox(height: 10),
                               Text(post.content, style: const TextStyle(fontSize: 15, height: 1.4)),
                               const SizedBox(height: 10),
-                              
-                              // إذا كان المنشور يحتوي على صورة، يتم عرضها فوراً بشكل محترف
                               if (post.imageUrl != null)
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
@@ -349,7 +340,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                                     ),
                                   ),
                                 ),
-                              
                               const Divider(height: 24, color: Color(0xFFE4E6EB)),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -357,7 +347,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                                   Expanded(
                                     child: TextButton.icon(
                                       onPressed: () => _sendLike(post.id),
-                                      icon: const Icon(Icons.thumb_up_out_line_rounded, size: 20),
+                                      // تم تصحيح اسم أيقونة الإعجاب هنا أيضاً لتعمل فوراً
+                                      icon: const Icon(Icons.thumb_up_alt_outlined, size: 20),
                                       label: Text("إعجاب (${post.likes})", style: const TextStyle(fontWeight: FontWeight.bold)),
                                     ),
                                   ),
