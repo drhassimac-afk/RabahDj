@@ -14,6 +14,7 @@ dependencies:
   shelf_router: ^1.1.4
   http: ^1.2.0
   shared_preferences: ^2.2.0 # مكتبة التخزي
+  video_player: ^2.8.2 # مكتبة تشغيل الفيديوهات والريلز الجديدة
 
 flutter:
   uses-material-design: true
