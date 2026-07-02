@@ -23,6 +23,10 @@ jobs:
         with:
           channel: stable
 
+      # الخطوة السحرية: تفعيل وتوليد مجلد الأندرويد والملفات المفقودة تلقائياً
+      - name: Create Android Platform Files
+        run: flutter create . --platforms=android
+
       - name: Install dependencies
         run: flutter pub get
 
