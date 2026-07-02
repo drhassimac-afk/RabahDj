@@ -20,7 +20,7 @@ class RabahDjFacebookApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Facebook Local',
+      title: 'Facebook Local Pro',
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
@@ -61,6 +61,11 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   bool _isServerRunning = false;
   HttpServer? _localServer;
   Timer? _autoRefreshTimer;
+  
+  // متغيرات ميزة الاكتشاف التلقائي الذكية (UDP)
+  RawDatagramSocket? _udpSocket;
+  Timer? _udpBroadcastTimer;
+  bool _isSearchingHost = false;
 
   @override
   void initState() {
@@ -69,6 +74,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _silentRefreshPosts();
     });
+    // بدء الاستماع التلقائي لأي سيرفر في الشبكة بمجرد فتح التطبيق
+    _startListeningForHosts();
   }
 
   @override
@@ -78,6 +85,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     _imageCtrl.dispose();
     _ipServerCtrl.dispose();
     _autoRefreshTimer?.cancel();
+    _udpBroadcastTimer?.cancel();
+    _udpSocket?.close();
     _localServer?.close();
     super.dispose();
   }
@@ -89,7 +98,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
           if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
             setState(() {
               _myIpAddress = addr.address;
-              _ipServerCtrl.text = _myIpAddress;
             });
             return;
           }
@@ -101,6 +109,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     }
   }
 
+  // 📡 المضيف: تشغيل السيرفر وبث الـ IP في الأجواء تلقائياً
   void _startLocalServer() async {
     final appRouter = shelf_router.Router();
 
@@ -132,9 +141,58 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       _localServer = await shelf_io.serve(appRouter, InternetAddress.anyIPv4, 8080);
       setState(() {
         _isServerRunning = true;
+        _ipServerCtrl.text = _myIpAddress;
       });
+      
+      // تشغيل البث الذكي التلقائي للـ IP عبر الشبكة
+      _startUdpBroadcast();
     } catch (e) {
       print(e);
+    }
+  }
+
+  // 🎇 دالة البث التلقائي (تخبر الأجهزة الأخرى بمكان السيرفر)
+  void _startUdpBroadcast() async {
+    try {
+      _udpSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      _udpSocket?.broadcastEnabled = true;
+
+      _udpBroadcastTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+        final String message = "RABAH_DJ_HOST:$_myIpAddress";
+        final List<int> dataToSend = utf8.encode(message);
+        // إرسال الإشارة لجميع الأجهزة في الشبكة المحلية عبر الـ Broadcast IP
+        _udpSocket?.send(dataToSend, InternetAddress('255.255.255.255'), 8888);
+      });
+    } catch (e) {
+      print("خطأ في بث UDP: $e");
+    }
+  }
+
+  // 🔍 العميل: الاستماع واكتشاف السيرفر تلقائياً دون كتابة يدوية
+  void _startListeningForHosts() async {
+    try {
+      setState(() => _isSearchingHost = true);
+      final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 8888);
+      socket.listen((RawSocketEvent event) {
+        if (event == RawSocketEvent.read) {
+          final Datagram? dg = socket.receive();
+          if (dg != null) {
+            final String msg = utf8.decode(dg.data);
+            if (msg.startsWith("RABAH_DJ_HOST:")) {
+              final detectedIp = msg.split(":")[1];
+              // إذا التقط التطبيق سيرفر نشط ولم يكن المستخدم هو المضيف نفسه، يربطه تلقائياً!
+              if (!_isServerRunning && _ipServerCtrl.text != detectedIp) {
+                setState(() {
+                  _ipServerCtrl.text = detectedIp;
+                  _isSearchingHost = false;
+                });
+              }
+            }
+          }
+        }
+      });
+    } catch (e) {
+      print("خطأ في استقبال UDP: $e");
     }
   }
 
@@ -205,8 +263,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         elevation: 1,
         actions: [
           IconButton(
-            // تم تصحيح الأيقونة هنا لتكون معتمدة ورسمية
-            icon: Icon(_isServerRunning ? Icons.wifi : Icons.wifi_off, color: _isServerRunning ? Colors.green : Colors.grey),
+            icon: Icon(_isServerRunning ? Icons.wifi : Icons.wifi_find_rounded, color: _isServerRunning ? Colors.green : Colors.blue),
             onPressed: _getWifiIp,
           )
         ],
@@ -215,31 +272,49 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
+            // شريط شبكي ذكي ومطور يعرض حالة الاتصال والبحث التلقائي
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
+                  Icon(
+                    _isServerRunning ? Icons.radio_button_checked : Icons.radar_rounded,
+                    size: 18,
+                    color: _isServerRunning ? Colors.green : Colors.orange,
+                  ),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: TextField(
-                      controller: _ipServerCtrl,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: const InputDecoration(hintText: "IP المضيف", border: InputBorder.none, prefixIcon: Icon(Icons.link, size: 18)),
+                    child: Text(
+                      _isServerRunning 
+                        ? "أنت المضيف النشط على شبكة الـ Wi-Fi" 
+                        : (_ipServerCtrl.text.isNotEmpty 
+                            ? "متصل تلقائياً بالمضيف: ${_ipServerCtrl.text}" 
+                            : "جاري البحث التلقائي عن أصدقائك بالشبكة... 🔍"),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
                     ),
                   ),
-                  ElevatedButton(
-                    onPressed: _isServerRunning ? null : _startLocalServer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isServerRunning ? Colors.green.shade100 : Colors.blue.shade50,
-                      foregroundColor: _isServerRunning ? Colors.green : Colors.blue,
-                      elevation: 0,
+                  if (!_isServerRunning && _ipServerCtrl.text.isEmpty)
+                    const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                  if (!_isServerRunning && _ipServerCtrl.text.isNotEmpty)
+                    const Text("🟢 نشط", style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                  if (!_isServerRunning && _ipServerCtrl.text.isEmpty)
+                    ElevatedButton(
+                      onPressed: _startLocalServer,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade50,
+                        foregroundColor: Colors.blue,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      child: const Text("ابدأ بث 📡", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
-                    child: Text(_isServerRunning ? "مضيف نشط" : "بدء بث 📡", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
                 ],
               ),
             ),
             const SizedBox(height: 8),
+
+            // صندوق النشر الفيسلوكي المحترف
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(12),
@@ -284,6 +359,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                 ],
               ),
             ),
+
+            // الخلاصة الإخبارية (News Feed)
             Expanded(
               child: _posts.isEmpty
                   ? Center(
@@ -294,7 +371,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                           const SizedBox(height: 8),
                           Text("لا توجد منشورات في شبكة الـ Wi-Fi حالياً", style: TextStyle(color: Colors.grey.shade500)),
                         ],
-                      ),
+                      )
                     )
                   : ListView.builder(
                       itemCount: _posts.length,
@@ -347,7 +424,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                                   Expanded(
                                     child: TextButton.icon(
                                       onPressed: () => _sendLike(post.id),
-                                      // تم تصحيح اسم أيقونة الإعجاب هنا أيضاً لتعمل فوراً
                                       icon: const Icon(Icons.thumb_up_alt_outlined, size: 20),
                                       label: Text("إعجاب (${post.likes})", style: const TextStyle(fontWeight: FontWeight.bold)),
                                     ),
