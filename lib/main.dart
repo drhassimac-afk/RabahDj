@@ -6,6 +6,7 @@ import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart' as shelf_router;
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart'; // استيراد التخزين
 import 'post_model.dart';
 
 void main() {
@@ -62,6 +63,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   @override
   void initState() {
     super.initState();
+    _loadPostsFromLocal(); // 💾 تحميل المنشورات المحفوظة فوراً عند فتح التطبيق
     _getWifiIp();
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _silentRefreshPosts();
@@ -80,6 +82,80 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     _udpSocket?.close();
     _localServer?.close();
     super.dispose();
+  }
+
+  // 💾 دالة حفظ المنشورات محلياً في ذاكرة الهاتف
+  Future<void> _savePostsToLocal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = _posts.map((p) => p.toMap()).toList();
+      await prefs.setString('local_posts_backup', jsonEncode(jsonList));
+    } catch (e) {
+      print("خطأ في الحفظ المحلي: $e");
+    }
+  }
+
+  // 💾 دالة استرجاع المنشورات من ذاكرة الهاتف
+  Future<void> _loadPostsFromLocal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedData = prefs.getString('local_posts_backup');
+      if (savedData != null) {
+        final List decodedList = jsonDecode(savedData);
+        setState(() {
+          _posts = decodedList.map((item) => PostModel.fromMap(item)).toList();
+        });
+      }
+    } catch (e) {
+      print("خطأ في التحميل المحلي: $e");
+    }
+  }
+
+  // 🔔 دالة ذكية لإظهار إشعارات منبثقة أنيقة داخل التطبيق
+  void _showNotification(String message, IconData icon) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message, style: const TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1877F2),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  // 🔔 دالة فحص ومقارنة التحديثات لإطلاق الإشعارات المناسبة
+  void _checkForNotifications(List<PostModel> newPosts) {
+    if (_posts.isEmpty && newPosts.isNotEmpty) {
+      _showNotification("تم تحديث وجلب منشورات جديدة من الشبكة! 🌐", Icons.dynamic_feed);
+      return;
+    }
+
+    if (newPosts.length > _posts.length) {
+      final latestPost = newPosts.first;
+      _showNotification("قام ${latestPost.username} بنشر منشور جديد الآن! 📝", Icons.post_add);
+    } else {
+      // فحص الإعجابات أو التعليقات الجديدة في المنشورات الحالية
+      for (var newP in newPosts) {
+        final oldP = _posts.firstWhere((p) => p.id == newP.id, orElse: () => newP);
+        if (newP.likes > oldP.likes) {
+          _showNotification("حصل منشور ${newP.username} على إعجاب جديد! 👍", Icons.thumb_up);
+          break;
+        }
+        if (newP.comments.length > oldP.comments.length) {
+          final lastComment = newP.comments.last;
+          _showNotification("علق ${lastComment.username}: \"${lastComment.text}\" 💬", Icons.comment);
+          break;
+        }
+      }
+    }
   }
 
   Future<void> _getWifiIp() async {
@@ -108,9 +184,12 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
 
     appRouter.post('/add_post', (shelf.Request request) async {
       final payload = await request.readAsString();
+      final newPost = PostModel.fromMap(jsonDecode(payload));
       setState(() {
-        _posts.insert(0, PostModel.fromMap(jsonDecode(payload)));
+        _posts.insert(0, newPost);
       });
+      _savePostsToLocal(); // حفظ التغيير
+      _showNotification("قام مستخدم بنشر منشور على سيرفرك الخاص! 📡", Icons.cloud_done);
       return shelf.Response.ok(jsonEncode({'status': 'success'}));
     });
 
@@ -121,6 +200,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         final index = _posts.indexWhere((p) => p.id == id);
         if (index != -1) _posts[index].likes++;
       });
+      _savePostsToLocal(); // حفظ التغيير
       return shelf.Response.ok(jsonEncode({'status': 'liked'}));
     });
 
@@ -136,6 +216,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
           _posts[index].comments.add(CommentModel.fromMap(commentData));
         }
       });
+      _savePostsToLocal(); // حفظ التغيير
       return shelf.Response.ok(jsonEncode({'status': 'comment_added'}));
     });
 
@@ -146,6 +227,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         _ipServerCtrl.text = _myIpAddress;
       });
       _startUdpBroadcast();
+      _showNotification("تم تفعيل السيرفر وبث الشبكة بنجاح! 📡", Icons.g_rounded);
     } catch (e) {
       print(e);
     }
@@ -175,6 +257,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
               final detectedIp = msg.split(":")[1];
               if (!_isServerRunning && _ipServerCtrl.text != detectedIp) {
                 setState(() => _ipServerCtrl.text = detectedIp);
+                _showNotification("تم العثور والاتصال التلقائي بمضيف نشط: $detectedIp 📡", Icons.wifi_lock);
               }
             }
           }
@@ -192,9 +275,14 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       final response = await http.get(Uri.parse('http://$targetIp:8080/posts')).timeout(const Duration(seconds: 1));
       if (response.statusCode == 200) {
         final List decodedList = jsonDecode(utf8.decode(response.bodyBytes));
+        final List<PostModel> incomingPosts = decodedList.map((item) => PostModel.fromMap(item)).toList();
+        
+        _checkForNotifications(incomingPosts); // فحص التفاعلات الجديدة لإطلاق الإشعارات
+
         setState(() {
-          _posts = decodedList.map((item) => PostModel.fromMap(item)).toList();
+          _posts = incomingPosts;
         });
+        _savePostsToLocal(); // تحديث الذاكرة المستديمة بالبيانات الجديدة المجلوبة
       }
     } catch (_) {}
   }
@@ -219,9 +307,14 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
 
     if (_isServerRunning && targetIp == _myIpAddress) {
       setState(() => _posts.insert(0, newPost));
+      _savePostsToLocal();
+      _showNotification("تم نشر منشورك بنجاح محلياً! ✅", Icons.check_circle);
     } else {
       try {
-        await http.post(Uri.parse('http://$targetIp:8080/add_post'), body: newPost.toJson());
+        final res = await http.post(Uri.parse('http://$targetIp:8080/add_post'), body: newPost.toJson());
+        if (res.statusCode == 200) {
+          _showNotification("تم إرسال منشورك إلى شبكة الصديق بنجاح! 🚀", Icons.send_rounded);
+        }
       } catch (e) {
         print(e);
       }
@@ -256,6 +349,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         final index = _posts.indexWhere((p) => p.id == postId);
         if (index != -1) _posts[index].comments.add(commentObj);
       });
+      _savePostsToLocal();
     } else {
       try {
         await http.post(
@@ -286,7 +380,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // تم إزالة كلمة const من هنا لحل مشكلة البناء بنجاح
                   Center(child: Container(width: 40, height: 4, decoration: const BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.all(Radius.circular(10))))),
                   const SizedBox(height: 10),
                   const Text("التعليقات", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -502,4 +595,3 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     );
   }
 }
-
