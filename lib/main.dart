@@ -1,61 +1,85 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:shelf_router/shelf_router.dart' as shelf_router; // تعديل ذكي لمنع التداخل
+import 'package:shelf_router/shelf_router.dart' as shelf_router;
 import 'package:http/http.dart' as http;
 import 'post_model.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const RabahDjLocalApp());
+  runApp(const RabahDjFacebookApp());
 }
 
-class RabahDjLocalApp extends StatelessWidget {
-  const RabahDjLocalApp({super.key});
+class RabahDjFacebookApp extends StatelessWidget {
+  const RabahDjFacebookApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'RabahDj Wi-Fi Pro',
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        colorScheme: const ColorScheme.dark(primary: Colors.cyanAccent),
+      title: 'Facebook Local',
+      // ثيم فيسبوك الأزرق العصري والمريح
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        primaryColor: const Color(0xFF1877F2), // أزرق فيسبوك الرسمي
+        scaffoldBackgroundColor: const Color(0xFFF0F2F5), // لون الخلفية الرمادي الفاتح المريح
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF1877F2),
+          secondary: Color(0xFF42B72A), // أخضر فيسبوك لعمليات النشر
+          surface: Colors.white,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 1,
+          iconTheme: IconThemeData(color: Colors.black87),
+          titleTextStyle: TextStyle(color: Color(0xFF1877F2), fontSize: 24, fontWeight: FontWeight.bold),
+        ),
       ),
-      home: const LocalHomePage(),
+      home: const FacebookHomePage(),
     );
   }
 }
 
-class LocalHomePage extends StatefulWidget {
-  const LocalHomePage({super.key});
+class FacebookHomePage extends StatefulWidget {
+  const FacebookHomePage({super.key});
 
   @override
-  State<LocalHomePage> createState() => _LocalHomePageState();
+  State<FacebookHomePage> createState() => _FacebookHomePageState();
 }
 
-class _LocalHomePageState extends State<LocalHomePage> {
-  List<PostModel> _localPosts = [];
+class _FacebookHomePageState extends State<FacebookHomePage> {
+  List<PostModel> _posts = [];
   final _usernameCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
+  final _imageCtrl = TextEditingController(); // حقل اختياري لإضافة رابط صورة
   final _ipServerCtrl = TextEditingController();
 
   String _myIpAddress = "جاري جلب الـ IP...";
   bool _isServerRunning = false;
   HttpServer? _localServer;
+  Timer? _autoRefreshTimer; // ميزة التحديث التلقائي بدون تدخل المستخدم
 
   @override
   void initState() {
     super.initState();
     _getWifiIp();
+    // تفعيل التحديث التلقائي الصامت كل ثانيتين لجلب المنشورات الجديدة فوراً
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      _silentRefreshPosts();
+    });
   }
 
   @override
   void dispose() {
     _usernameCtrl.dispose();
     _contentCtrl.dispose();
+    _imageCtrl.dispose();
     _ipServerCtrl.dispose();
+    _autoRefreshTimer?.cancel();
     _localServer?.close();
     super.dispose();
   }
@@ -80,18 +104,18 @@ class _LocalHomePageState extends State<LocalHomePage> {
   }
 
   void _startLocalServer() async {
-    final appRouter = shelf_router.Router(); // تم حل التداخل هنا بنجاح
+    final appRouter = shelf_router.Router();
 
     appRouter.get('/posts', (shelf.Request request) {
-      final jsonList = _localPosts.map((p) => p.toMap()).toList();
-      return shelf.Response.ok(jsonEncode(jsonList), headers: {'Content-Type': 'application/json'});
+      final jsonList = _posts.map((p) => p.toMap()).toList();
+      return shelf.Response.ok(jsonEncode(jsonList), headers: {'Content-Type': 'application/json; charset=utf-8'});
     });
 
     appRouter.post('/add_post', (shelf.Request request) async {
       final payload = await request.readAsString();
       final data = jsonDecode(payload);
       setState(() {
-        _localPosts.insert(0, PostModel.fromMap(data));
+        _posts.insert(0, PostModel.fromMap(data));
       });
       return shelf.Response.ok(jsonEncode({'status': 'success'}));
     });
@@ -100,8 +124,8 @@ class _LocalHomePageState extends State<LocalHomePage> {
       final payload = await request.readAsString();
       final id = jsonDecode(payload)['id'];
       setState(() {
-        final index = _localPosts.indexWhere((p) => p.id == id);
-        if (index != -1) _localPosts[index].likes++;
+        final index = _posts.indexWhere((p) => p.id == id);
+        if (index != -1) _posts[index].likes++;
       });
       return shelf.Response.ok(jsonEncode({'status': 'liked'}));
     });
@@ -112,44 +136,45 @@ class _LocalHomePageState extends State<LocalHomePage> {
         _isServerRunning = true;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل تشغيل السيرفر: $e")));
+      print(e);
     }
   }
 
-  Future<void> _refreshNetworkPosts() async {
+  // تحديث صامت خلف الكواليس لضمان انسيابية التطبيق مثل فيسبوك الحقيقي
+  Future<void> _silentRefreshPosts() async {
     final targetIp = _ipServerCtrl.text.trim();
     if (targetIp.isEmpty) return;
-
     try {
-      final response = await http.get(Uri.parse('http://$targetIp:8080/posts')).timeout(const Duration(seconds: 3));
+      final response = await http.get(Uri.parse('http://$targetIp:8080/posts')).timeout(const Duration(seconds: 1));
       if (response.statusCode == 200) {
-        final List decodedList = jsonDecode(response.body);
+        final List decodedList = jsonDecode(utf8.decode(response.bodyBytes));
         setState(() {
-          _localPosts = decodedList.map((item) => PostModel.fromMap(item)).toList();
+          _posts = decodedList.map((item) => PostModel.fromMap(item)).toList();
         });
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("فشل الاتصال بجهاز المضيف!")));
-    }
+    } catch (_) {}
   }
 
-  Future<void> _sendPostToNetwork() async {
+  Future<void> _sendPost() async {
     final content = _contentCtrl.text.trim();
     final user = _usernameCtrl.text.trim();
+    final imgUrl = _imageCtrl.text.trim();
     final targetIp = _ipServerCtrl.text.trim();
 
     if (content.isEmpty || targetIp.isEmpty) return;
 
     final newPost = PostModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      username: user.isEmpty ? "LocalUser" : user,
+      username: user.isEmpty ? "مستخدم فيسبوك" : user,
       content: content,
+      imageUrl: imgUrl.isEmpty ? null : imgUrl,
       likes: 0,
+      dateTime: DateTime.now(),
     );
 
     if (_isServerRunning && targetIp == _myIpAddress) {
       setState(() {
-        _localPosts.insert(0, newPost);
+        _posts.insert(0, newPost);
       });
     } else {
       try {
@@ -160,7 +185,8 @@ class _LocalHomePageState extends State<LocalHomePage> {
     }
 
     _contentCtrl.clear();
-    _refreshNetworkPosts();
+    _imageCtrl.clear();
+    _silentRefreshPosts();
     FocusScope.of(context).unfocus();
   }
 
@@ -168,7 +194,7 @@ class _LocalHomePageState extends State<LocalHomePage> {
     final targetIp = _ipServerCtrl.text.trim();
     try {
       await http.post(Uri.parse('http://$targetIp:8080/like'), body: jsonEncode({'id': id}));
-      _refreshNetworkPosts();
+      _silentRefreshPosts();
     } catch (e) {
       print(e);
     }
@@ -178,79 +204,166 @@ class _LocalHomePageState extends State<LocalHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("📡 RabahDj Wi-Fi Network"),
+        title: const Text("facebook"),
+        elevation: 1,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh, color: Colors.cyanAccent), onPressed: _refreshNetworkPosts)
+          IconButton(
+            icon: Icon(_isServerRunning ? Icons.g_network_left_sharp : Icons.wifi_off, color: _isServerRunning ? Colors.green : Colors.grey),
+            onPressed: _getWifiIp,
+          )
         ],
       ),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
+            // لوحة إعدادات الاتصال (مخفية بشكل أنيق كشريط علوي)
             Container(
-              color: const Color(0xFF1E1E1E),
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _ipServerCtrl,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: const InputDecoration(hintText: "IP المضيف", border: InputBorder.none, prefixIcon: Icon(Icons.link, size: 18)),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: _isServerRunning ? null : _startLocalServer,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isServerRunning ? Colors.green.shade100 : Colors.blue.shade50,
+                      foregroundColor: _isServerRunning ? Colors.green : Colors.blue,
+                      elevation: 0,
+                    ),
+                    child: Text(_isServerRunning ? "مضيف نشط" : "بدء بث 📡", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // صندوق إنشاء منشورات مثل فيسبوك الحقيقي تماماً
+            Container(
+              color: Colors.white,
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  Text("IP الخاص بك: $_myIpAddress", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                  const SizedBox(height: 8),
                   Row(
                     children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.blue.shade100,
+                        child: Text(_usernameCtrl.text.isNotEmpty ? _usernameCtrl.text[0].toUpperCase() : "F", style: const TextStyle(color: Color(0xFF1877F2), fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
-                          controller: _ipServerCtrl,
-                          decoration: const InputDecoration(hintText: "أدخل IP Mofid", border: OutlineInputBorder(), isDense: true),
+                          controller: _usernameCtrl,
+                          decoration: const InputDecoration(hintText: "اسمك الشخصي...", border: InputBorder.none),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: _isServerRunning ? null : _startLocalServer,
-                        style: ElevatedButton.styleFrom(backgroundColor: _isServerRunning ? Colors.green : Colors.blueGrey),
-                        child: Text(_isServerRunning ? "أنت المضيف 🟢" : "اجعلني المضيف 📡"),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                children: [
-                  TextField(controller: _usernameCtrl, decoration: const InputDecoration(hintText: "اسمك المستعار", prefixIcon: Icon(Icons.person))),
-                  const SizedBox(height: 8),
-                  TextField(controller: _contentCtrl, decoration: const InputDecoration(hintText: "اكتب رسالة للشبكة... 💬", prefixIcon: Icon(Icons.wifi))),
+                  const Divider(height: 20, color: Color(0xFFE4E6EB)),
+                  TextField(
+                    controller: _contentCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(hintText: "بماذا تفكر الآن؟", border: InputBorder.none),
+                  ),
+                  TextField(
+                    controller: _imageCtrl,
+                    style: const TextStyle(fontSize: 12, color: Colors.blue),
+                    decoration: const InputDecoration(hintText: "رابط صورة للمنشور (اختياري) 🖼️", border: InputBorder.none, isDense: true),
+                  ),
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
-                    height: 45,
+                    height: 38,
                     child: ElevatedButton(
-                      onPressed: _sendPostToNetwork,
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
-                      child: const Text("بث في الشبكة 🚀", style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: _sendPost,
+                      style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                      child: const Text("نشر", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
-                  ),
+                  )
                 ],
               ),
             ),
-            const Divider(),
+
+            // عرض خلاصة الأخبار (News Feed)
             Expanded(
-              child: _localPosts.isEmpty
-                  ? const Center(child: Text("اضغط على زر التحديث 🔄 لجلب منشورات الشبكة!"))
+              child: _posts.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.feed, size: 48, color: Colors.grey.shade400),
+                          const SizedBox(height: 8),
+                          Text("لا توجد منشورات في شبكة الـ Wi-Fi حالياً", style: TextStyle(color: Colors.grey.shade500)),
+                        ],
+                      ),
+                    )
                   : ListView.builder(
-                      itemCount: _localPosts.length,
+                      itemCount: _posts.length,
                       itemBuilder: (context, i) {
-                        final post = _localPosts[i];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          child: ListTile(
-                            title: Text("@${post.username}", style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
-                            subtitle: Text(post.content),
-                            trailing: TextButton.icon(
-                              icon: const Icon(Icons.favorite, color: Colors.red),
-                              label: Text("${post.likes}"),
-                              onPressed: () => _sendLike(post.id),
-                            ),
+                        final post = _posts[i];
+                        return Container(
+                          color: Colors.white,
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Colors.grey.shade200,
+                                    child: Text(post.username[0].toUpperCase(), style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(post.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                      Text("${post.dateTime.hour}:${post.dateTime.minute.toString().padLeft(2, '0')} عبر الشبكة المحلية", style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(post.content, style: const TextStyle(fontSize: 15, height: 1.4)),
+                              const SizedBox(height: 10),
+                              
+                              // إذا كان المنشور يحتوي على صورة، يتم عرضها فوراً بشكل محترف
+                              if (post.imageUrl != null)
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    post.imageUrl!,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      height: 100,
+                                      color: Colors.grey.shade100,
+                                      child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                                    ),
+                                  ),
+                                ),
+                              
+                              const Divider(height: 24, color: Color(0xFFE4E6EB)),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: TextButton.icon(
+                                      onPressed: () => _sendLike(post.id),
+                                      icon: const Icon(Icons.thumb_up_out_line_rounded, size: 20),
+                                      label: Text("إعجاب (${post.likes})", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         );
                       },
