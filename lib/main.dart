@@ -124,7 +124,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       return shelf.Response.ok(jsonEncode({'status': 'liked'}));
     });
 
-    // نقطة اتصال برمجية جديدة لاستقبال التعليقات عبر الشبكة
     appRouter.post('/add_comment', (shelf.Request request) async {
       final payload = await request.readAsString();
       final data = jsonDecode(payload);
@@ -244,7 +243,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     }
   }
 
-  // دالة إرسال تعليق جديد عبر الشبكة
   Future<void> _sendComment(String postId, String text) async {
     final targetIp = _ipServerCtrl.text.trim();
     final user = _usernameCtrl.text.trim().isEmpty ? "مستخدم فيسبوك" : _usernameCtrl.text.trim();
@@ -274,7 +272,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     _silentRefreshPosts();
   }
 
-  // نافذة التعليقات السفلية الأنيقة (Facebook Comments Sheet)
   void _showCommentsSheet(PostModel post) {
     final commentInputCtrl = TextEditingController();
     showModalBottomSheet(
@@ -335,7 +332,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                             setSheetState(() {
                               commentInputCtrl.clear();
                             });
-                            // تحديث الصفحة الرئيسية أيضاً لمعاينة التغيير
                             setState(() {});
                           }
                         },
@@ -475,7 +471,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                                   child: Image.network(post.imageUrl!, fit: BoxFit.cover, width: double.infinity),
                                 ),
                               const Divider(height: 24, color: Color(0xFFE4E6EB)),
-                              // شريط أزرار التفاعل المطور (إعجاب وتعليق)
                               Row(
                                 children: [
                                   Expanded(
