@@ -137,7 +137,12 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       importance: Importance.max, priority: Priority.high, ticker: 'ticker'
     );
     const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
-    await _localNotificationsPlugin.show(DateTime.now().millisecond, title, body, notificationDetails);
+    await _localNotificationsPlugin.show(
+  id: DateTime.now().millisecond,
+  title: title,
+  body: body,
+  notificationDetails: notificationDetails,
+);
   }
 
   Future<void> _loadProfileData() async {
