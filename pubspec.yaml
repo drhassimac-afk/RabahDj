@@ -9,14 +9,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
   shelf: ^1.4.1
   shelf_router: ^1.1.4
+  shelf_io: ^1.0.0
   http: ^1.2.0
-  shared_preferences: ^2.2.0 # مكتبة التخزي
-  video_player: ^2.8.2 # مكتبة تشغيل الفيديوهات والريلز الجديدة
-  image_picker: ^1.1.2 # المكتبة الجديدة لاختيار الصور والفيديوهات من الهاتف
-  path_provider: ^2.1.3 # المكتبة التي كانت ناقصة وتسببت في الخطأ
+  shared_preferences: ^2.2.0
+  video_player: ^2.8.2
+  image_picker: ^1.1.2
+  path_provider: ^2.1.3
+  record: ^5.1.2
+  audioplayers: ^6.0.0
+
   
 flutter:
   uses-material-design: true
