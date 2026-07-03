@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart'; // استدعاء المكتبة الجديدة
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -53,7 +54,6 @@ class FacebookHomePage extends StatefulWidget {
 
 class _FacebookHomePageState extends State<FacebookHomePage> {
   List<PostModel> _posts = [];
-  final _usernameCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
   final _ipServerCtrl = TextEditingController();
 
@@ -78,16 +78,22 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   StreamSubscription<Uint8List>? _audioStreamSubscription;
   InternetAddress? _connectedPeerIp;
 
-  // متغيرات ميزة الملف الشخصي (Profile)
+  // ميزات الملف الشخصي
   String _profileName = "مستخدم فيسبوك";
   String? _localAvatarPath;
   String? _localCoverPath;
+
+  // متغيرات ميزة المشاركة السريعة (AirDrop Local)
+  List<String> _receivedFiles = [];
+  double _transferProgress = 0.0;
+  bool _isTransferring = false;
 
   @override
   void initState() {
     super.initState();
     _loadProfileData();
     _loadPostsFromLocal();
+    _loadReceivedFiles();
     _getWifiIp();
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _silentRefreshPosts();
@@ -97,7 +103,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
 
   @override
   void dispose() {
-    _usernameCtrl.dispose();
     _contentCtrl.dispose();
     _ipServerCtrl.dispose();
     _autoRefreshTimer?.cancel();
@@ -110,24 +115,34 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     super.dispose();
   }
 
-  // تحميل بيانات البروفايل محلياً
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _profileName = prefs.getString('user_profile_name') ?? "مستخدم محلي";
-      _usernameCtrl.text = _profileName;
       _localAvatarPath = prefs.getString('user_avatar_path');
       _localCoverPath = prefs.getString('user_cover_path');
     });
   }
 
-  // حفظ بيانات البروفايل
   Future<void> _saveProfileData(String name, String? avatar, String? cover) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_profile_name', name);
     if (avatar != null) await prefs.setString('user_avatar_path', avatar);
     if (cover != null) await prefs.setString('user_cover_path', cover);
     _loadProfileData();
+  }
+
+  // تحميل قائمة الملفات المستلمة محلياً
+  Future<void> _loadReceivedFiles() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _receivedFiles = prefs.getStringList('local_received_files_v1') ?? [];
+    });
+  }
+
+  Future<void> _saveReceivedFiles() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('local_received_files_v1', _receivedFiles);
   }
 
   Future<void> _loadPostsFromLocal() async {
@@ -184,14 +199,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     } catch (_) {}
   }
 
-  // التقاط وتدفق الوسائط من المعرض لحساب البروفايل أو المنشورات
-  Future<String?> _saveFileToDocs(File file, String prefix) async {
-    final docDir = await getApplicationDocumentsDirectory();
-    final fileName = '${prefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final savedFile = await file.copy('${docDir.path}/$fileName');
-    return savedFile.path;
-  }
-
   void _toggleVoiceCall() async {
     if (_isInVoiceCall) {
       _audioStreamSubscription?.cancel();
@@ -208,6 +215,46 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
             _udpSocket!.send(audioData, _connectedPeerIp!, 9999);
           }
         });
+      }
+    }
+  }
+
+  // ميزة الإرسال السريع للملفات الكبيرة عبر HTTP Stream عالي السرعة
+  Future<void> _sendLocalFileViaAirDrop() async {
+    final targetIp = _ipServerCtrl.text.trim();
+    if (targetIp.isEmpty) {
+      _showNotification("الرجاء الاتصال بصديق أولاً لبدء الإرسال 🔌", Icons.warning);
+      return;
+    }
+
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    if (result != null && result.files.single.path != null) {
+      File file = File(result.files.single.path!);
+      String fileName = result.files.single.name;
+      int totalBytes = await file.length();
+
+      setState(() { _isTransferring = true; _transferProgress = 0.0; });
+      _showNotification("جاري إرسال الملف بسرعة فائقة... ⚡", Icons.bolt);
+
+      try {
+        final request = http.MultipartRequest('POST', Uri.parse('http://$targetIp:8080/airdrop'));
+        request.headers['filename'] = Uri.encodeComponent(fileName);
+        
+        final streamUpload = http.ByteStream(file.openRead());
+        final multipartFile = http.MultipartFile('file', streamUpload, totalBytes, filename: fileName);
+        request.files.add(multipartFile);
+
+        final response = await request.send();
+        if (response.statusCode == 200) {
+          setState(() { _isTransferring = false; _transferProgress = 1.0; });
+          _showNotification("تم إرسال الملف بنجاح! 🎉 ($fileName)", Icons.cloud_done);
+        } else {
+          setState(() { _isTransferring = false; });
+          _showNotification("فشل الإرسال، حاول مجدداً", Icons.error);
+        }
+      } catch (_) {
+        setState(() { _isTransferring = false; });
+        _showNotification("حدث خطأ في الشبكة المحلية", Icons.gpp_bad);
       }
     }
   }
@@ -239,6 +286,33 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       setState(() { _posts.insert(0, newPost); });
       _savePostsToLocal();
       return shelf.Response.ok(jsonEncode({'status': 'success'}));
+    });
+
+    // استقبال وحفظ الملفات المرسلة من الصديق عبر الشبكة المحلية فوراً وبأعلى سرعة
+    appRouter.post('/airdrop', (shelf.Request request) async {
+      try {
+        final rawName = request.headers['filename'] ?? 'shared_file.dat';
+        final fileName = Uri.decodeComponent(rawName);
+        final docDir = await getApplicationDocumentsDirectory();
+        final savePath = '${docDir.path}/$fileName';
+        
+        final file = File(savePath);
+        final ios = file.openWrite();
+        
+        await request.read().forEach((chunk) {
+          ios.add(chunk);
+        });
+        await ios.close();
+
+        setState(() {
+          _receivedFiles.insert(0, savePath);
+        });
+        _saveReceivedFiles();
+        _showNotification("استلمت ملفاً جديداً من صديقك! 📁 ($fileName)", Icons.download_done_rounded);
+        return shelf.Response.ok(jsonEncode({'status': 'received'}));
+      } catch (_) {
+        return shelf.Response.internalServerError();
+      }
     });
 
     try {
@@ -320,8 +394,10 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     String? localVideoUrl;
 
     if (_selectedImageFile != null) {
-      final path = await _saveFileToDocs(_selectedImageFile!, 'img');
-      localImgUrl = 'http://$_myIpAddress:8080/files/${path!.split('/').last}';
+      final docDir = await getApplicationDocumentsDirectory();
+      final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await _selectedImageFile!.copy('${docDir.path}/$fileName');
+      localImgUrl = 'http://$_myIpAddress:8080/files/$fileName';
     }
     if (_selectedVideoFile != null) {
       final docDir = await getApplicationDocumentsDirectory();
@@ -375,7 +451,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                   TextField(controller: _contentCtrl, maxLines: 2, decoration: const InputDecoration(hintText: "ماذا يدور في ذهنك؟...")),
                   const SizedBox(height: 12),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    main => MainAxisAlignment.center,
                     children: [
                       TextButton.icon(onPressed: () async {
                         final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
@@ -399,13 +475,11 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     );
   }
 
-  // شاشة تعديل وإظهار الحساب الشخصي (Profile View)
   Widget _buildProfileView() {
     final nameController = TextEditingController(text: _profileName);
     return SingleChildScrollView(
       child: Column(
         children: [
-          // الغلاف والصورة الشخصية
           Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
@@ -416,62 +490,38 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                   if (img != null) _saveProfileData(_profileName, _localAvatarPath, img.path);
                 },
                 child: Container(
-                  height: 180,
-                  width: double.infinity,
-                  color: Colors.grey.shade300,
-                  child: _localCoverPath != null 
-                      ? Image.file(File(_localCoverPath!), fit: BoxFit.cover)
-                      : const Center(child: Icon(Icons.add_a_photo, color: Colors.black54, size: 30)),
+                  height: 140, width: double.infinity, color: Colors.grey.shade300,
+                  child: _localCoverPath != null ? Image.file(File(_localCoverPath!), fit: BoxFit.cover) : const Center(child: Icon(Icons.add_a_photo, color: Colors.black54)),
                 ),
               ),
               Positioned(
-                bottom: -50,
+                bottom: -40,
                 child: GestureDetector(
                   onTap: () async {
                     final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
                     if (img != null) _saveProfileData(_profileName, img.path, _localCoverPath);
                   },
                   child: CircleAvatar(
-                    radius: 55,
-                    backgroundColor: Colors.white,
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.blue.shade100,
-                      backgroundImage: _localAvatarPath != null ? FileImage(File(_localAvatarPath!)) : null,
-                      child: _localAvatarPath == null ? const Icon(Icons.camera_alt, size: 30) : null,
-                    ),
+                    radius: 45, backgroundColor: Colors.white,
+                    child: CircleAvatar(radius: 42, backgroundColor: Colors.blue.shade100, backgroundImage: _localAvatarPath != null ? FileImage(File(_localAvatarPath!)) : null, child: _localAvatarPath == null ? const Icon(Icons.camera_alt) : null),
                   ),
                 ),
               )
             ],
           ),
-          const SizedBox(height: 60),
-          // تفاصيل الاسم وتحديث الحساب
+          const SizedBox(height: 50),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Card(
-              elevation: 2,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    Text(_profileName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text(_profileName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: "تعديل الاسم المستعار", border: OutlineInputBorder()),
-                    ),
+                    TextField(controller: nameController, decoration: const InputDecoration(labelText: "تعديل الاسم المستعار", border: OutlineInputBorder())),
                     const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        if (nameController.text.trim().isNotEmpty) {
-                          _saveProfileData(nameController.text.trim(), _localAvatarPath, _localCoverPath);
-                          _showNotification("تم تحديث ملفك الشخصي! ✨", Icons.badge);
-                        }
-                      },
-                      icon: const Icon(Icons.save),
-                      label: const Text("حفظ التغييرات"),
-                    )
+                    ElevatedButton(onPressed: () { if (nameController.text.trim().isNotEmpty) _saveProfileData(nameController.text.trim(), _localAvatarPath, _localCoverPath); }, child: const Text("حفظ التغييرات")),
                   ],
                 ),
               ),
@@ -482,12 +532,74 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     );
   }
 
+  // واجهة التبويب الجديد لمشاركة الملفات السريعة (Local Share UI)
+  Widget _buildShareView() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          Card(
+            color: Colors.blue.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  const Icon(Icons.bolt, size: 50, color: Colors.orange),
+                  const SizedBox(height: 8),
+                  const Text("مشاركة الملفات السريعة محلياً", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text("أرسل واستقبل أي ملف، تطبيق، أو مستند بسرعة فائقة وبدون إنترنت", style: TextStyle(fontSize: 12, color: Colors.black54), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  if (_isTransferring) ...[
+                    const LinearProgressIndicator(color: Colors.orange),
+                    const SizedBox(height: 8),
+                    const Text("جاري معالجة ونقل الملف البيني... ⚡", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ] else
+                    ElevatedButton.icon(
+                      onPressed: _sendLocalFileViaAirDrop,
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1877F2), foregroundColor: Colors.white),
+                      icon: const Icon(Icons.drive_folder_upload),
+                      label: const Text("اختر وأرسل ملفاً الآن 📁"),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Row(children: [Icon(Icons.folder_shared, color: Colors.blue), SizedBox(width: 6), Text("الملفات المستلمة محلياً", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15))]),
+          const Divider(),
+          Expanded(
+            child: _receivedFiles.isEmpty
+                ? const Center(child: Text("لم تستلم أي ملفات بعد.", style: TextStyle(color: Colors.black38)))
+                : ListView.builder(
+                    itemCount: _receivedFiles.length,
+                    itemBuilder: (context, index) {
+                      final path = _receivedFiles[index];
+                      final name = path.split('/').last;
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
+                          leading: const Icon(Icons.insert_drive_file, color: Colors.green),
+                          title: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(path, style: const TextStyle(fontSize: 10, color: Colors.black38), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          trailing: IconButton(icon: const Icon(Icons.open_in_new, color: Colors.blue), onPressed: () {
+                            _showNotification("الملف محفوظ في الحافظة المستندات الآمنة للهاتف", Icons.info);
+                          }),
+                        ),
+                      );
+                    },
+                  ),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final feedsList = _posts.where((p) => p.type == 'post').toList();
 
     return DefaultTabController(
-      length: 3, // تم تغيير الطول إلى 3 لإضافة تبويب البروفايل
+      length: 4, // تم تغيير الطول إلى 4 لدمج التبويبات الأربعة معاً
       child: Scaffold(
         appBar: AppBar(
           title: const Text("facebook", style: TextStyle(color: Color(0xFF1877F2), fontWeight: FontWeight.bold, fontSize: 26, letterSpacing: -0.5)),
@@ -498,10 +610,12 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
             IconButton(icon: Icon(_isServerRunning ? Icons.wifi : Icons.wifi_find_rounded, color: _isServerRunning ? Colors.green : Colors.blue), onPressed: _getWifiIp)
           ],
           bottom: const TabBar(
+            isScrollable: false,
             tabs: [
-              Tab(icon: Icon(Icons.home, size: 26), text: "الأخبار"),
-              Tab(icon: Icon(Icons.person, size: 26), text: "الملف الشخصي"),
-              Tab(icon: Icon(Icons.movie_filter_outlined, size: 26), text: "ريلز"),
+              Tab(icon: Icon(Icons.home, size: 24), text: "الأخبار"),
+              Tab(icon: Icon(Icons.person, size: 24), text: "بروفايل"),
+              Tab(icon: Icon(Icons.bolt, size: 24), text: "مشاركة"),
+              Tab(icon: Icon(Icons.movie_filter_outlined, size: 24), text: "ريلز"),
             ],
             indicatorColor: Color(0xFF1877F2),
             labelColor: Color(0xFF1877F2),
@@ -511,7 +625,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         body: TabBarView(
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            // تبويب الأخبار الأساسي
+            // 1. تبويب الأخبار
             Column(
               children: [
                 if (_isInVoiceCall)
@@ -531,7 +645,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                     children: [
                       Icon(_isServerRunning ? Icons.radio_button_checked : Icons.radar_rounded, size: 18, color: _isServerRunning ? Colors.green : Colors.orange),
                       const SizedBox(width: 6),
-                      Expanded(child: Text(_isServerRunning ? "بثك نشط على: $_myIpAddress" : "يبحث تلقائياً عن الأصدقاء... 🔍", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                      Expanded(child: Text(_isServerRunning ? "بثك نشط على: $_myIpAddress" : "متصل بالمضيف: ${_ipServerCtrl.text.isEmpty ? 'جاري البحث تلقائياً...' : _ipServerCtrl.text}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                       if (!_isServerRunning && _ipServerCtrl.text.isEmpty) ElevatedButton(onPressed: _startLocalServer, child: const Text("ابدأ بث 📡")),
                     ],
                   ),
@@ -569,10 +683,12 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                 ),
               ],
             ),
-            // تبويب الملف الشخصي الجديد (Profile)
+            // 2. تبويب البروفايل الشخصي
             _buildProfileView(),
-            // تبويب الريلز الفيديوهات
-            const Center(child: Text("تبويب الريلز جاهز وبانتظار فيديوهاتكم! 🎬")),
+            // 3. تبويب مشاركة الملفات السريعة الجديد (AirDrop)
+            _buildShareView(),
+            // 4. تبويب الريلز
+            const Center(child: Text("تبويب الريلز جاهز وبانتظار فيديوهاتكم الممتعة! 🎬")),
           ],
         ),
       ),
@@ -608,4 +724,3 @@ class _LocalVideoWidgetState extends State<LocalVideoWidget> {
     return AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller));
   }
 }
-
