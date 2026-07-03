@@ -451,8 +451,9 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                   TextField(controller: _contentCtrl, maxLines: 2, decoration: const InputDecoration(hintText: "ماذا يدور في ذهنك؟...")),
                   const SizedBox(height: 12),
                   Row(
-                    main => MainAxisAlignment.center,
-                    children: [
+                   mainAxisAlignment: MainAxisAlignment.center,
+                   children: [
+
                       TextButton.icon(onPressed: () async {
                         final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
                         if (img != null) setSheetState(() { _selectedImageFile = File(img.path); _selectedVideoFile = null; });
