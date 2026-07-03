@@ -227,7 +227,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       return;
     }
 
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result = await FilePicker.instance.pickFiles();
     if (result != null && result.files.single.path != null) {
       File file = File(result.files.single.path!);
       String fileName = result.files.single.name;
