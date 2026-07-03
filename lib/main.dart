@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -8,8 +9,10 @@ import 'package:shelf_router/shelf_router.dart' as shelf_router;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
-import 'package:image_picker/image_picker.dart'; // المكتبة الجديدة
-import 'package:path_provider/path_provider.dart'; // لتخزين الملفات محلياً وبثها
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart'; // مكتبة التسجيل الجديدة
+import 'package:audioplayers/audioplayers.dart'; // مكتبة التشغيل الجديدة
 import 'post_model.dart';
 
 void main() {
@@ -62,11 +65,18 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   RawDatagramSocket? _udpSocket;
   Timer? _udpBroadcastTimer;
 
-  // متغيرات اختيار الملفات الحقيقية
   final ImagePicker _picker = ImagePicker();
   File? _selectedImageFile;
   File? _selectedVideoFile;
   bool _isUploading = false;
+
+  // متغيرات ميزة الغرف الصوتية والمكالمات الحية
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isInVoiceCall = false;
+  bool _isMuted = false;
+  StreamSubscription<Uint8List>? _audioStreamSubscription;
+  InternetAddress? _connectedPeerIp;
 
   @override
   void initState() {
@@ -88,6 +98,9 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     _udpBroadcastTimer?.cancel();
     _udpSocket?.close();
     _localServer?.close();
+    _audioStreamSubscription?.cancel();
+    _audioRecorder.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -156,38 +169,62 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     }
   }
 
-  // دالة ذكية لاختيار صورة من المعرض
   Future<void> _pickImage(StateSetter setSheetState) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setSheetState(() {
         _selectedImageFile = File(image.path);
-        _selectedVideoFile = null; // إلغاء الفيديو إذا تم اختيار صورة
+        _selectedVideoFile = null;
       });
     }
   }
 
-  // دالة ذكية لاختيار فيديو من المعرض
   Future<void> _pickVideo(StateSetter setSheetState) async {
     final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
     if (video != null) {
       setSheetState(() {
         _selectedVideoFile = File(video.path);
-        _selectedImageFile = null; // إلغاء الصورة إذا تم اختيار فيديو
+        _selectedImageFile = null;
       });
+    }
+  }
+
+  // تفعيل اتصال الصوت الحي محلياً وثنائياً عبر بروتوكول شبكة UDP مخصص للمكالمات السريعة
+  void _toggleVoiceCall() async {
+    if (_isInVoiceCall) {
+      // إغلاق المكالمة
+      _audioStreamSubscription?.cancel();
+      await _audioRecorder.stop();
+      setState(() { _isInVoiceCall = false; });
+      _showNotification("تم مغادرة الغرفة الصوتية 🚪", Icons.call_end);
+    } else {
+      // بدء المكالمة الصوتية المحلية
+      if (await _audioRecorder.hasPermission()) {
+        setState(() { _isInVoiceCall = true; });
+        _showNotification("أنت الآن داخل الغرفة الصوتية الحية! 🎙️", Icons.mic);
+        
+        final stream = await _audioRecorder.startStream(
+          const RecordConfig(encoder: AudioEncoder.pcm16Bits, sampleRate: 16000),
+        );
+
+        _audioStreamSubscription = stream.listen((Uint8List audioData) {
+          if (!_isMuted && _udpSocket != null && _connectedPeerIp != null) {
+            // إرسال حزم الصوت فوراً لصديقك في الشبكة
+            _udpSocket!.send(audioData, _connectedPeerIp!, 9999);
+          }
+        });
+      }
     }
   }
 
   void _startLocalServer() async {
     final appRouter = shelf_router.Router();
 
-    // مسار جلب المنشورات
     appRouter.get('/posts', (shelf.Request request) {
       final jsonList = _posts.map((p) => p.toMap()).toList();
       return shelf.Response.ok(jsonEncode(jsonList), headers: {'Content-Type': 'application/json; charset=utf-8'});
     });
 
-    // مسار بث الملفات والصور والفيديوهات المرفوعة محلياً لأي شخص في الشبكة
     appRouter.get('/files/<filename>', (shelf.Request request, String filename) async {
       try {
         final docDir = await getApplicationDocumentsDirectory();
@@ -243,6 +280,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         _ipServerCtrl.text = _myIpAddress;
       });
       _startUdpBroadcast();
+      _startUdpVoiceSocket(); // تشغيل مستقبل الصوت المحلي
       _showNotification("تم تفعيل سيرفر فيسبوك المطور بنجاح! 📡", Icons.router);
     } catch (_) {}
   }
@@ -257,6 +295,22 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     } catch (_) {}
   }
 
+  // مستقبل حزم الصوت وتشغيلها في سماعة الطرف الآخر فوراً بدون تأخير
+  void _startUdpVoiceSocket() async {
+    try {
+      final voiceSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 9999);
+      voiceSocket.listen((RawSocketEvent event) {
+        if (event == RawSocketEvent.read) {
+          final Datagram? dg = voiceSocket.receive();
+          if (dg != null && _isInVoiceCall) {
+            // تشغيل تدفق الصوت المستلم فوراً
+            _audioPlayer.play(BytesSource(dg.data));
+          }
+        }
+      });
+    } catch (_) {}
+  }
+
   void _startListeningForHosts() async {
     try {
       final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 8888);
@@ -267,6 +321,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
             final String msg = utf8.decode(dg.data);
             if (msg.startsWith("RABAH_DJ_HOST:")) {
               final detectedIp = msg.split(":")[1];
+              _connectedPeerIp = dg.address; // حفظ الـ IP للمكالمة الصوتية
               if (!_isServerRunning && _ipServerCtrl.text != detectedIp) {
                 setState(() => _ipServerCtrl.text = detectedIp);
                 _showNotification("متصل تلقائياً بشبكة صديقك: $detectedIp ⚡", Icons.wifi_lock);
@@ -293,7 +348,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     } catch (_) {}
   }
 
-  // دالة النشر الذكية المتوافقة مع ملفات الاستوديو الحقيقية والبث المحلي
   Future<void> _sendMediaPost(String type) async {
     final content = _contentCtrl.text.trim();
     final user = _usernameCtrl.text.trim();
@@ -307,19 +361,17 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     String? localImgUrl;
     String? localVideoUrl;
 
-    // معالجة وحفظ الصورة المحددة داخل السيرفر المحلي لبثها للآخرين
     if (_selectedImageFile != null) {
       final docDir = await getApplicationDocumentsDirectory();
       final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final savedFile = await _selectedImageFile!.copy('${docDir.path}/$fileName');
+      await _selectedImageFile!.copy('${docDir.path}/$fileName');
       localImgUrl = 'http://$_myIpAddress:8080/files/$fileName';
     }
 
-    // معالجة وحفظ الفيديو المحدد داخل السيرفر المحلي لبثه للآخرين
     if (_selectedVideoFile != null) {
       final docDir = await getApplicationDocumentsDirectory();
       final fileName = 'vid_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      final savedFile = await _selectedVideoFile!.copy('${docDir.path}/$fileName');
+      await _selectedVideoFile!.copy('${docDir.path}/$fileName');
       localVideoUrl = 'http://$_myIpAddress:8080/files/$fileName';
     }
 
@@ -383,7 +435,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                   TextField(controller: _contentCtrl, maxLines: 2, decoration: const InputDecoration(hintText: "اكتب تفاصيل أو نص هنا...")),
                   const SizedBox(height: 12),
                   
-                  // عرض معاينة للملف المختار من الهاتف قبل النشر
                   if (_selectedImageFile != null)
                     Container(height: 100, width: 100, margin: const EdgeInsets.only(bottom: 10), decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), image: DecorationImage(image: FileImage(_selectedImageFile!), fit: BoxFit.cover)))
                   else if (_selectedVideoFile != null)
@@ -506,6 +557,11 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
           title: const Text("facebook", style: TextStyle(color: Color(0xFF1877F2), fontWeight: FontWeight.bold, fontSize: 26, letterSpacing: -0.5)),
           elevation: 1,
           actions: [
+            // زر تشغيل وإغلاق المكالمة الصوتية الحية
+            IconButton(
+              icon: Icon(_isInVoiceCall ? Icons.phone_in_talk : Icons.phone_disabled, color: _isInVoiceCall ? Colors.green : Colors.red, size: 26),
+              onPressed: _toggleVoiceCall,
+            ),
             IconButton(icon: const Icon(Icons.add_box_outlined, color: Colors.black, size: 28), onPressed: _showCreatePostBottomSheet),
             IconButton(icon: Icon(_isServerRunning ? Icons.wifi : Icons.wifi_find_rounded, color: _isServerRunning ? Colors.green : Colors.blue), onPressed: _getWifiIp)
           ],
@@ -524,6 +580,28 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
           children: [
             Column(
               children: [
+                // شريط التنبيه في حال وجود مكالمة حية نشطة
+                if (_isInVoiceCall)
+                  Container(
+                    color: Colors.green.shade600,
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.record_voice_over, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text("المكالمة الصوتية المحلية نشطة الآن...", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ],
+                        ),
+                        IconButton(
+                          icon: Icon(_isMuted ? Icons.mic_off : Icons.mic, color: Colors.white, size: 18),
+                          onPressed: () { setState(() { _isMuted = !_isMuted; }); },
+                        )
+                      ],
+                    ),
+                  ),
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
