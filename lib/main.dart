@@ -32,7 +32,7 @@ void main() async {
   // تهيئة نظام الإشعارات للهواتف
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
   const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-  await _localNotificationsPlugin.initialize(initializationSettings);
+  await _localNotificationsPlugin.initialize(settings: initializationSettings);
 
   runApp(const RabahDjFacebookApp());
 }
@@ -137,20 +137,21 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
       importance: Importance.max, priority: Priority.high, ticker: 'ticker'
     );
     const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
-    Future<void> _triggerSystemNotification(String title, String body) async {
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'facebook_local_share_channels', 'Facebook Local Notifications',
-        importance: Importance.max, priority: Priority.high, ticker: 'ticker'
-      );
-      const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
+      Future<void> _triggerSystemNotification(String title, String body) async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'facebook_local_share_channels', 'Facebook Local Notifications',
+      importance: Importance.max, priority: Priority.high, ticker: 'ticker'
+    );
+    const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
     
-      await _localNotificationsPlugin.show(
-        DateTime.now().millisecond, // المعامل الأول للايدي يكون Positional عادة
-        title,                      // العنوان Positional
-        body,                       // المحتوى Positional
-        notificationDetails: notificationDetails, // هذا فقط يكون Named
-      );
-    }
+    await _localNotificationsPlugin.show(
+      id: DateTime.now().millisecond,
+      title: title,
+      body: body,
+      notificationDetails: notificationDetails,
+    );
+  }
+
  } 
 
   Future<void> _loadProfileData() async {
