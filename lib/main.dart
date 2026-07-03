@@ -204,8 +204,9 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         _showNotification("أنت الآن داخل الغرفة الصوتية الحية! 🎙️", Icons.mic);
         
         final stream = await _audioRecorder.startStream(
-          const RecordConfig(encoder: AudioEncoder.pcm16Bit, sampleRate: 16000),
+          const RecordConfig(), // فارغة لكي يختار النظام التنسيق الأنسب للهاتف تلقائياً
         );
+
 
         _audioStreamSubscription = stream.listen((Uint8List audioData) {
           if (!_isMuted && _udpSocket != null && _connectedPeerIp != null) {
