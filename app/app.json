@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "RabahDj",
+    "slug": "rabahdj",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rabahdj.app"
+    },
+    "android": {
+      "package": "com.rabahdj.app",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_WIFI_STATE"
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1446edba-06f4-4c8a-872f-80eb9fe32db6"
+      }
+    }
+  }
+}
