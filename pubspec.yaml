@@ -26,6 +26,6 @@ dependencies:
       path: record
   audioplayers: ^6.0.0
   encrypt: ^5.0.3
-  flutter_local_notifications: ^17.0.0  # هذا الإصدار يحل مشكلة الـ ambiguous وبدون تعقيدات الـ desugaring
+  flutter_local_notifications: 14.1.1
 flutter:
   uses-material-design: true
