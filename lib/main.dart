@@ -32,7 +32,7 @@ void main() async {
   // تهيئة نظام الإشعارات للهواتف
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
   const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-  await _localNotificationsPlugin.initialize(settings: initializationSettings);
+  await _localNotificationsPlugin.initialize(initializationSettings);
 
   runApp(const RabahDjFacebookApp());
 }
