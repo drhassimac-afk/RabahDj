@@ -8,17 +8,16 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart' as shelf_router;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:encrypt/encrypt.dart' as enc; // استيراد مكتبة التشفير
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // مكتبة الإشعارات
+import 'package:encrypt/encrypt.dart' as enc;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'post_model.dart';
 
-// إعدادات التشفير (مفتاح سري مشترك ثابت لتبسيط الاتصال البيني الآمن)
+// إعدادات التشفير المتقدمة المشتركة
 final _cryptoKey = enc.Key.fromUtf8('my32bytesecretkeymustbe32chars!!');
 final _cryptoIV = enc.IV.fromLength(16);
 final _encrypter = enc.Encrypter(enc.AES(_cryptoKey));
@@ -29,7 +28,7 @@ final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNo
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تهيئة نظام الإشعارات للهواتف
+  // تهيئة الإشعارات المتوافقة تماماً مع إصدار 2026
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
   const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
   await _localNotificationsPlugin.initialize(initializationSettings);
@@ -47,14 +46,8 @@ class RabahDjFacebookApp extends StatelessWidget {
       title: 'Facebook Local Pro',
       theme: ThemeData(
         useMaterial3: true,
-        brightness: Brightness.light,
         primaryColor: const Color(0xFF1877F2),
         scaffoldBackgroundColor: const Color(0xFFF0F2F5),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF1877F2),
-          secondary: Color(0xFF42B72A),
-          surface: Colors.white,
-        ),
       ),
       home: const FacebookHomePage(),
     );
@@ -83,10 +76,9 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
 
   final ImagePicker _picker = ImagePicker();
   File? _selectedImageFile;
-  File? _selectedVideoFile;
   bool _isUploading = false;
 
-  // ميزات الصوت الحية
+  // ميزات الصوت
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isInVoiceCall = false;
@@ -99,7 +91,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   String? _localAvatarPath;
   String? _localCoverPath;
 
-  // ميزات المشاركة السريعة
+  // ميزات المشاركة
   List<String> _receivedFiles = [];
   bool _isTransferring = false;
 
@@ -130,8 +122,8 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     super.dispose();
   }
 
-  // دالة إطلاق إشعار للنظام
-    Future<void> _triggerSystemNotification(String title, String body) async {
+  // دالة إطلاق الإشعارات المتوافقة مع الإصدار الجديد بدون مسميات خاطئة
+  Future<void> _triggerSystemNotification(String title, String body) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'facebook_local_share_channels', 'Facebook Local Notifications',
       importance: Importance.max, priority: Priority.high, ticker: 'ticker'
@@ -139,14 +131,12 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
     
     await _localNotificationsPlugin.show(
-      DateTime.now().millisecond, // المعامل 1: id
-      title,                      // المعامل 2: title
-      body,                       // المعامل 3: body
-      notificationDetails,        // المعامل 4: notificationDetails (بدون اسم!)
+      DateTime.now().millisecond,
+      title,
+      body,
+      notificationDetails,
     );
   }
-
- } 
 
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -202,12 +192,11 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
           children: [
             Icon(icon, color: Colors.white, size: 20),
             const SizedBox(width: 10),
-            Expanded(child: Text(message, style: const TextStyle(fontWeight: FontWeight.bold))),
+            Expanded(child: Text(message)),
           ],
         ),
         backgroundColor: const Color(0xFF1877F2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -235,11 +224,10 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     } else {
       if (await _audioRecorder.hasPermission()) {
         setState(() { _isInVoiceCall = true; });
-        _showNotification("أنت الآن داخل الغرفة الصوتية المشفرة آمنياً! 🎙️🔒", Icons.mic);
+        _showNotification("أنت داخل الغرفة الصوتية المشفرة آمنياً! 🎙️🔒", Icons.mic);
         final stream = await _audioRecorder.startStream(const RecordConfig());
         _audioStreamSubscription = stream.listen((Uint8List audioData) {
           if (!_isMuted && _udpSocket != null && _connectedPeerIp != null) {
-            // تشفير دفق الصوت الحي لحظياً لحماية الخصوصية عبر الشبكة
             final encryptedAudio = _encrypter.encryptBytes(audioData, iv: _cryptoIV).bytes;
             _udpSocket!.send(encryptedAudio, _connectedPeerIp!, 9999);
           }
@@ -280,7 +268,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     final appRouter = shelf_router.Router();
 
     appRouter.get('/posts', (shelf.Request request) {
-      // تفريغ البيانات وتشفير الاستجابة لضمان أمان تغذية الأخبار بالكامل
       final jsonList = _posts.map((p) => p.toMap()).toList();
       final encryptedBody = _encrypter.encrypt(jsonEncode(jsonList), iv: _cryptoIV).base64;
       return shelf.Response.ok(encryptedBody);
@@ -289,7 +276,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     appRouter.get('/files/<filename>', (shelf.Request request, String filename) async {
       try {
         final docDir = await getApplicationDocumentsDirectory();
-        final file = File('${docDir.path}//files/$filename');
+        final file = File('${docDir.path}/files/$filename');
         if (await file.exists()) return shelf.Response.ok(file.openRead());
       } catch (_) {}
       return shelf.Response.notFound('Not Found');
@@ -297,16 +284,13 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
 
     appRouter.post('/add_post', (shelf.Request request) async {
       final payload = await request.readAsString();
-      // فك التشفير الآمن للمنشور القادم من العميل
       final decryptedPayload = _encrypter.decrypt64(payload, iv: _cryptoIV);
       final newPost = PostModel.fromMap(jsonDecode(decryptedPayload));
       
       setState(() { _posts.insert(0, newPost); });
       _savePostsToLocal();
 
-      // إطلاق إشعار حقيقي في هاتف المستقبل ينبئه بوجود منشور جديد فوراً بدون إنترنت!
       _triggerSystemNotification("منشور جديد من ${newPost.username} 📝", newPost.content);
-
       return shelf.Response.ok('success');
     });
 
@@ -325,9 +309,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         setState(() { _receivedFiles.insert(0, savePath); });
         _saveReceivedFiles();
 
-        // إشعار فوري باستلام ملف محلي
         _triggerSystemNotification("مشاركة سريعة 📁", "استلمت ملفاً جديداً: $fileName");
-
         return shelf.Response.ok('received');
       } catch (_) { return shelf.Response.internalServerError(); }
     });
@@ -358,7 +340,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
         if (event == RawSocketEvent.read) {
           final Datagram? dg = voiceSocket.receive();
           if (dg != null && _isInVoiceCall) {
-            // فك تشفير الصوت الحي المستلم حماية للخصوصية
             final decryptedAudio = _encrypter.decryptBytes(enc.Encrypted(dg.data), iv: _cryptoIV);
             _audioPlayer.play(BytesSource(Uint8List.fromList(decryptedAudio)));
           }
@@ -380,7 +361,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
               _connectedPeerIp = dg.address;
               if (!_isServerRunning && _ipServerCtrl.text != detectedIp) {
                 setState(() => _ipServerCtrl.text = detectedIp);
-                _triggerSystemNotification("اتصال تلقائي الشبكة 📡", "تم قفل الاتصال والربط مع المضيف: $detectedIp");
+                _triggerSystemNotification("اتصال تلقائي بالشبكة 📡", "تم قفل الاتصال والربط مع المضيف: $detectedIp");
               }
             }
           }
@@ -395,7 +376,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     try {
       final response = await http.get(Uri.parse('http://$targetIp:8080/posts')).timeout(const Duration(seconds: 1));
       if (response.statusCode == 200) {
-        // فك تشفير التغذية الإخبارية القادمة من الصديق بشكل آمن تماماً
         final decryptedBody = _encrypter.decrypt64(response.body, iv: _cryptoIV);
         final List decodedList = jsonDecode(decryptedBody);
         setState(() { _posts = decodedList.map((item) => PostModel.fromMap(item)).toList(); });
@@ -404,15 +384,14 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     } catch (_) {}
   }
 
-  Future<void> _sendMediaPost(String type) async {
+  Future<void> _sendMediaPost() async {
     final content = _contentCtrl.text.trim();
     final targetIp = _ipServerCtrl.text.trim();
-    if (content.isEmpty && _selectedImageFile == null && _selectedVideoFile == null) return;
+    if (content.isEmpty && _selectedImageFile == null) return;
     if (targetIp.isEmpty) return;
 
     setState(() => _isUploading = true);
     String? localImgUrl;
-    String? localVideoUrl;
 
     if (_selectedImageFile != null) {
       final docDir = await getApplicationDocumentsDirectory();
@@ -423,11 +402,10 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
 
     final newPost = PostModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(), username: _profileName,
-      content: content, imageUrl: localImgUrl, videoUrl: localVideoUrl,
-      type: type, likes: 0, dateTime: DateTime.now(), comments: [],
+      content: content, imageUrl: localImgUrl, videoUrl: null,
+      type: 'post', likes: 0, dateTime: DateTime.now(), comments: [],
     );
 
-    // تشفير محتوى المنشور بالكامل خوارزمية AES قبل الدفع للشبكة
     final encryptedPostPayload = _encrypter.encrypt(jsonEncode(newPost.toMap()), iv: _cryptoIV).base64;
 
     if (_isServerRunning && targetIp == _myIpAddress) {
@@ -457,7 +435,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                 children: [
                   Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(10))),
                   const SizedBox(height: 12),
-                  Text("نشر محتوى مشفر وآمن 📸🔒", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text("نشر محتوى مشفر وآمن 📸🔒", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const Divider(),
                   TextField(controller: _contentCtrl, maxLines: 2, decoration: const InputDecoration(hintText: "ماذا يدور في ذهنك؟...")),
                   const SizedBox(height: 12),
@@ -471,7 +449,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                     ],
                   ),
                   const Divider(),
-                  _isUploading ? const CircularProgressIndicator() : ElevatedButton(onPressed: () => _sendMediaPost('post'), child: const Text("نشر مشفر الآن")),
+                  _isUploading ? const CircularProgressIndicator() : ElevatedButton(onPressed: _sendMediaPost, child: const Text("نشر مشفر الآن")),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -596,8 +574,6 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final feedsList = _posts.where((p) => p.type == 'post').toList();
-
     return DefaultTabController(
       length: 4,
       child: Scaffold(
@@ -649,12 +625,12 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                   ),
                 ),
                 Expanded(
-                  child: feedsList.isEmpty
+                  child: _posts.isEmpty
                       ? const Center(child: Text("لا توجد منشورات حالياً"))
                       : ListView.builder(
-                          itemCount: feedsList.length,
+                          itemCount: _posts.length,
                           itemBuilder: (context, i) {
-                            final post = feedsList[i];
+                            final post = _posts[i];
                             return Container(
                               color: Colors.white, margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
                               child: Column(
@@ -666,14 +642,18 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
                                       const SizedBox(width: 8),
                                       Text(post.username, style: const TextStyle(fontWeight: FontWeight.bold)),
                                       const Spacer(),
-                                      const Icon(Icons.security, size: 14, color: Colors.green), // شارة للمنشور المشفر
+                                      const Icon(Icons.security, size: 14, color: Colors.green),
                                     ],
                                   ),
                                   const SizedBox(height: 6),
                                   Text(post.content),
                                   if (post.imageUrl != null) Padding(padding: const EdgeInsets.only(top: 8), child: Image.network(post.imageUrl!)),
                                   const Divider(),
-                                  TextButton.icon(onPressed: () => setState(() { post.likes++; }), icon: const Icon(Icons.thumb_up_outlined), label: Text("إعجاب (${post.likes})")),
+                                  TextButton.icon(
+                                    onPressed: () => setState(() { post.likes++; }), 
+                                    icon: const Icon(Icons.thumb_up_outlined), 
+                                    label: Text("إعجاب (${post.likes})")
+                                  ),
                                 ],
                               ),
                             );
@@ -691,4 +671,5 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     );
   }
 }
+
 
