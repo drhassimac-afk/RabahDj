@@ -131,13 +131,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   }
 
   // دالة إطلاق إشعار للنظام
-  Future<void> _triggerSystemNotification(String title, String body) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'facebook_local_share_channels', 'Facebook Local Notifications',
-      importance: Importance.max, priority: Priority.high, ticker: 'ticker'
-    );
-    const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
-      Future<void> _triggerSystemNotification(String title, String body) async {
+    Future<void> _triggerSystemNotification(String title, String body) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'facebook_local_share_channels', 'Facebook Local Notifications',
       importance: Importance.max, priority: Priority.high, ticker: 'ticker'
@@ -145,10 +139,10 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
     
     await _localNotificationsPlugin.show(
-      id: DateTime.now().millisecond,
-      title: title,
-      body: body,
-      notificationDetails: notificationDetails,
+      DateTime.now().millisecond, // المعامل 1: id
+      title,                      // المعامل 2: title
+      body,                       // المعامل 3: body
+      notificationDetails,        // المعامل 4: notificationDetails (بدون اسم!)
     );
   }
 
