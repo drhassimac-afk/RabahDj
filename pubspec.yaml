@@ -26,6 +26,6 @@ dependencies:
       path: record
   audioplayers: ^6.0.0
   encrypt: ^5.0.3
-  flutter_local_notifications: 17.3.0
+  flutter_local_notifications: ^22.0.1
 flutter:
   uses-material-design: true
