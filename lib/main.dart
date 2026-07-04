@@ -31,7 +31,7 @@ void main() async {
   // تهيئة الإشعارات المتوافقة تماماً مع إصدار 2026
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
   const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-  await _localNotificationsPlugin.initialize(initializationSettings);
+  await _localNotificationsPlugin.initialize(settings: initializationSettings);
 
   runApp(const RabahDjFacebookApp());
 }
@@ -123,7 +123,7 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
   }
 
   // دالة إطلاق الإشعارات المتوافقة مع الإصدار الجديد بدون مسميات خاطئة
-  Future<void> _triggerSystemNotification(String title, String body) async {
+    Future<void> _triggerSystemNotification(String title, String body) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'facebook_local_share_channels', 'Facebook Local Notifications',
       importance: Importance.max, priority: Priority.high, ticker: 'ticker'
@@ -131,10 +131,10 @@ class _FacebookHomePageState extends State<FacebookHomePage> {
     const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
     
     await _localNotificationsPlugin.show(
-      DateTime.now().millisecond,
-      title,
-      body,
-      notificationDetails,
+      id: DateTime.now().millisecond,
+      title: title,
+      body: body,
+      notificationDetails: notificationDetails,
     );
   }
 
