@@ -106,7 +106,7 @@ jobs:
 
       - name: 🛠️ Force Overwrite build.gradle.kts with AGP 9.0+ Specifications
         run: |
-          # كتابة الهيكل الحديث المتوافق مع معايير جافا وكوتلن و Gradle الجديدة لعام 2026
+          # تحديث compileSdk لـ 36 وتحديث مكتبة التوافقية لـ 2.1.4 بناءً على طلب نظام أندرويد
           cat << 'EOF' > android/app/build.gradle.kts
           plugins {
               id("com.android.application")
@@ -114,10 +114,9 @@ jobs:
               id("dev.flutter.flutter-gradle-plugin")
           }
 
-          // استخدام الهيكل الحديث المستقبلي لمنع تضارب الـ DSL
           configure<com.android.build.api.dsl.ApplicationExtension> {
               namespace = "com.example.rabahdj_local_app"
-              compileSdk = 34
+              compileSdk = 36
 
               compileOptions {
                   isCoreLibraryDesugaringEnabled = true
@@ -125,7 +124,6 @@ jobs:
                   targetCompatibility = JavaVersion.VERSION_1_8
               }
 
-              // التحديث الأهم: الانتقال إلى compilerOptions بدلاً من kotlinOptions لتفادي أخطاء التجميع
               tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
                   compilerOptions {
                       jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
@@ -152,7 +150,8 @@ jobs:
           }
 
           dependencies {
-              coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+              // التحديث المطلوب للإصدار المتوافق
+              coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
           }
           EOF
 
