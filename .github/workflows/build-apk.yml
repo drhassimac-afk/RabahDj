@@ -1,0 +1,125 @@
+name: Generate and Build Clean Flutter App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 🚀 Setup Flutter Stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: 🏗️ Create Fresh Flutter Project
+        run: |
+          # حذف أي ملفات قديمة مسببة للتضارب لتبدأ الصفحة بيضاء تماماً
+          rm -rf * .gitignore
+          # إنشاء مشروع فلاتر جديد تماماً باسم تطبيقك المحيطي
+          flutter create clean_app --org com.example --project-name rabahdj_local_app --platforms=android
+          # نقل الملفات للمجلد الرئيسي لتسهيل البناء
+          mv clean_app/* .
+          mv clean_app/.[!.]* .
+          rm -rf clean_app
+
+      - name: 📝 Inject Target pubspec.yaml Dependencies
+        run: |
+          # إضافة حزمة الإشعارات والـ uuid تلقائياً في ملف pubspec المتوافق
+          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  uuid: ^4.3.3' pubspec.yaml
+
+      - name: 📲 Inject Your custom main.dart Source Code
+        run: |
+          # كتابة كود تطبيقك النظيف والمستقر مباشرة إلى ملف lib/main.dart
+          cat << 'EOF' > lib/main.dart
+          import 'package:flutter/material.dart';
+          import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+          final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+          void main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+            const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+            
+            // استخدام المعاملات المسمّاة المتوافقة مع v22
+            await _localNotificationsPlugin.initialize(settings: initializationSettings);
+            runApp(const MyApp());
+          }
+
+          class MyApp extends StatelessWidget {
+            const MyApp({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+                home: const HomeScreen(),
+              );
+            }
+          }
+
+          class HomeScreen extends StatelessWidget {
+            const HomeScreen({super.key});
+
+            Future<void> _triggerSystemNotification(String title, String body) async {
+              const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+                'rabahdj_local_channels', 'RabahDj Notifications',
+                importance: Importance.max, priority: Priority.high, ticker: 'ticker'
+              );
+              const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
+              
+              await _localNotificationsPlugin.show(
+                id: DateTime.now().millisecond,
+                title: title,
+                body: body,
+                notificationDetails: notificationDetails,
+              );
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('RabahDj Local Network')),
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () => _triggerSystemNotification('مرحباً بك!', 'تم تشغيل نظام الإشعارات المحلي بنجاح 🟢'),
+                    child: const Text('إرسال إشعار تجريبي'),
+                  ),
+                ),
+              );
+            }
+          }
+          EOF
+
+      - name: 🛠️ Force Enable Core Library Desugaring inside Build Script
+        run: |
+          # تفعيل التوافقية أوتوماتيكياً في ملف الأندرويد المولد حديثاً لتجاوز أي خطأ metadata
+          sed -i '/compileOptions {/a \        coreLibraryDesugaringEnabled true' android/app/build.gradle
+          sed -i '/dependencies {/a \    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"' android/app/build.gradle
+
+      - name: 📦 Install Flutter Packages
+        run: flutter pub get
+
+      - name: ⚡ Build Production Release APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: 📤 Upload Final APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RabahDj-Flutter-Final-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
