@@ -1,0 +1,28 @@
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-size: 20
+          cache: 'npm'
+          cache-dependency-path: app/package.json
+
+      - name: 🚀 Setup Expo CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }} # ستحتاج لإضافة الـ Token الخاص بحساب Expo في الـ Secrets إذا كنت تستخدم EAS
+
+      - name: 📦 Install Dependencies
+        run: |
+          cd app
+          npm install
+
+      - name: 🏗️ Build APK Local (بدون حساب EAS المدفوع)
+        run: |
+          cd app
+          npx expo prebuild -p android
+          cd android
+          ./gradlew assembleRelease
