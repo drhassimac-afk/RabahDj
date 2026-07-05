@@ -104,9 +104,9 @@ jobs:
           }
           EOF
 
-      - name: 🛠️ Force Overwrite build.gradle.kts with Proper Desugaring Configuration
+      - name: 🛠️ Force Overwrite build.gradle.kts with AGP 9.0+ Specifications
         run: |
-          # استبدال كامل للملف لضمان وضع مكتبة التوافقية في مكانها البرمجي الصحيح 100%
+          # كتابة الهيكل الحديث المتوافق مع معايير جافا وكوتلن و Gradle الجديدة لعام 2026
           cat << 'EOF' > android/app/build.gradle.kts
           plugins {
               id("com.android.application")
@@ -114,7 +114,8 @@ jobs:
               id("dev.flutter.flutter-gradle-plugin")
           }
 
-          android {
+          // استخدام الهيكل الحديث المستقبلي لمنع تضارب الـ DSL
+          configure<com.android.build.api.dsl.ApplicationExtension> {
               namespace = "com.example.rabahdj_local_app"
               compileSdk = 34
 
@@ -124,8 +125,11 @@ jobs:
                   targetCompatibility = JavaVersion.VERSION_1_8
               }
 
-              kotlinOptions {
-                  jvmTarget = "1.8"
+              // التحديث الأهم: الانتقال إلى compilerOptions بدلاً من kotlinOptions لتفادي أخطاء التجميع
+              tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+                  compilerOptions {
+                      jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+                  }
               }
 
               defaultConfig {
