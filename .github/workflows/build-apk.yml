@@ -30,7 +30,7 @@ jobs:
         run: |
           # حذف أي ملفات قديمة مسببة للتضارب لتبدأ الصفحة بيضاء تماماً
           rm -rf * .gitignore
-          # إنشاء مشروع فلاتر جديد تماماً باسم تطبيقك المحيطي
+          # إنشاء مشروع فلاتر جديد تماماً
           flutter create clean_app --org com.example --project-name rabahdj_local_app --platforms=android
           # نقل الملفات للمجلد الرئيسي لتسهيل البناء
           mv clean_app/* .
@@ -56,7 +56,6 @@ jobs:
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             
-            // استخدام المعاملات المسمّاة المتوافقة مع v22
             await _localNotificationsPlugin.initialize(settings: initializationSettings);
             runApp(const MyApp());
           }
@@ -105,11 +104,11 @@ jobs:
           }
           EOF
 
-      - name: 🛠️ Force Enable Core Library Desugaring inside Build Script
+      - name: 🛠️ Force Enable Core Library Desugaring inside Build Script (.kts)
         run: |
-          # تفعيل التوافقية أوتوماتيكياً في ملف الأندرويد المولد حديثاً لتجاوز أي خطأ metadata
-          sed -i '/compileOptions {/a \        coreLibraryDesugaringEnabled true' android/app/build.gradle
-          sed -i '/dependencies {/a \    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"' android/app/build.gradle
+          # التعديل الذكي المتوافق مع صيغة Kotlin DSL المحدثة لعام 2026
+          sed -i '/compileOptions {/a \        isCoreLibraryDesugaringEnabled = true' android/app/build.gradle.kts
+          sed -i '/dependencies {/a \    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")' android/app/build.gradle.kts
 
       - name: 📦 Install Flutter Packages
         run: flutter pub get
