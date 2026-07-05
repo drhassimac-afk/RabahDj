@@ -28,34 +28,32 @@ jobs:
 
       - name: 🏗️ Create Fresh Flutter Project
         run: |
-          # حذف أي ملفات قديمة مسببة للتضارب لتبدأ الصفحة بيضاء تماماً
           rm -rf * .gitignore
-          # إنشاء مشروع فلاتر جديد تماماً
           flutter create clean_app --org com.example --project-name rabahdj_local_app --platforms=android
-          # نقل الملفات للمجلد الرئيسي لتسهيل البناء
           mv clean_app/* .
           mv clean_app/.[!.]* .
           rm -rf clean_app
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
-          # إضافة حزمة الإشعارات والـ uuid تلقائياً في ملف pubspec المتوافق
-          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  uuid: ^4.3.3' pubspec.yaml
+          # إضافة حزم الإشعارات، الـ Sockets والـ uuid لإدارة البيانات المحلية
+          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3' pubspec.yaml
 
-      - name: 📲 Inject Your custom main.dart Source Code
+      - name: 📲 Inject Professional Social Media Feed UI & Socket Code
         run: |
-          # كتابة كود تطبيقك النظيف والمستقر مباشرة إلى ملف lib/main.dart
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
           import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+          import 'package:socket_io_client/socket_io_client.dart' as IO;
+          import 'package:uuid/uuid.dart';
 
           final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
+          late IO.Socket socket;
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-            
             await _localNotificationsPlugin.initialize(settings: initializationSettings);
             runApp(const MyApp());
           }
@@ -65,39 +63,239 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
-                theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData(
+                  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2)), // لون فيسبوك الرسمي
+                  useMaterial3: true,
+                ),
                 home: const HomeScreen(),
               );
             }
           }
 
-          class HomeScreen extends StatelessWidget {
+          class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
+            @override
+            State<HomeScreen> createState() => _HomeScreenState();
+          }
 
-            Future<void> _triggerSystemNotification(String title, String body) async {
+          class _HomeScreenState extends State<HomeScreen> {
+            final TextEditingController _ipController = TextEditingController(text: "192.168.1.10");
+            final TextEditingController _postController = TextEditingController();
+            final List<Map<String, dynamic>> _posts = [];
+            bool _isConnected = false;
+            int _onlineCount = 1;
+
+            @override
+            void initState() {
+              super.initState();
+              // تفعيل إشعار ترحيبي محلي عند التشغيل
+              _triggerLocalNotification('مرحباً بك في RabahDj', 'تطبيق الشبكة المحلية جاهز للاتصال 🟢');
+            }
+
+            void _connectToLocalServer() {
+              String serverUrl = "http://${_ipController.text.trim()}:4000";
+              
+              socket = IO.io(serverUrl, IO.OptionBuilder()
+                .setTransports(['websocket'])
+                .disableAutoConnect()
+                .build());
+
+              socket.connect();
+
+              socket.onConnect((_) {
+                setState(() {
+                  _isConnected = true;
+                });
+                _triggerLocalNotification('تم الاتصال!', 'أنت الآن متصل بالسيرفر المحلي بنجاح 🌐');
+              });
+
+              socket.onDisconnect((_) {
+                setState(() {
+                  _isConnected = false;
+                });
+              });
+
+              // الاستماع للمنشورات الجديدة القادمة من الأجهزة الأخرى عبر الواي فاي
+              socket.on('newPost', (data) {
+                setState(() {
+                  _posts.insert(0, Map<String, dynamic>.from(data));
+                });
+                _triggerLocalNotification('منشور جديد من الشبكة!', data['text'] ?? '');
+              });
+
+              // تحديث عدد المتصلين بالواي فاي حالياً
+              socket.on('updateOnlineCount', (count) {
+                setState(() {
+                  _onlineCount = count;
+                });
+              });
+            }
+
+            void _submitPost() {
+              if (_postController.text.trim().isEmpty) return;
+
+              final newPost = {
+                'id': const Uuid().v4(),
+                'username': 'مستخدم محلي',
+                'text': _postController.text.trim(),
+                'likes': 0,
+                'timestamp': 'الآن'
+              };
+
+              if (_isConnected) {
+                socket.emit('createPost', newPost);
+              } else {
+                // وضع تجريبي أوفلاين في حال عدم وجود سيرفر بعد لكي لا تعطل الواجهة
+                setState(() {
+                  _posts.insert(0, newPost);
+                });
+              }
+              _postController.clear();
+            }
+
+            Future<void> _triggerLocalNotification(String title, String body) async {
               const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
                 'rabahdj_local_channels', 'RabahDj Notifications',
-                importance: Importance.max, priority: Priority.high, ticker: 'ticker'
+                importance: Importance.max, priority: Priority.high
               );
-              const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
-              
               await _localNotificationsPlugin.show(
-                id: DateTime.now().millisecond,
-                title: title,
-                body: body,
-                notificationDetails: notificationDetails,
+                DateTime.now().millisecond, title, body, const NotificationDetails(android: androidDetails)
               );
             }
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('RabahDj Local Network')),
-                body: Center(
-                  child: ElevatedButton(
-                    onPressed: () => _triggerSystemNotification('مرحباً بك!', 'تم تشغيل نظام الإشعارات المحلي بنجاح 🟢'),
-                    child: const Text('إرسال إشعار تجريبي'),
-                  ),
+                backgroundColor: const Color(0xFFF0F2F5), // خلفية فيسبوك المريحة
+                appBar: AppBar(
+                  backgroundColor: const Color(0xFF1877F2),
+                  title: const Text('RabahDj Local Network', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  actions: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      child: Center(
+                        child: Text(
+                          _isConnected ? '🟢 متصل ($_onlineCount)' : '🔴 منفصل',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+                body: Column(
+                  children: [
+                    // قسم إدخال الـ IP للاتصال بالشبكة
+                    Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.all(10.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _ipController,
+                              decoration: const InputDecoration(
+                                labelText: 'عنوان IP السيرفر المحلي',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1877F2)),
+                            onPressed: _connectToLocalServer,
+                            child: const Text('ربط', style: TextStyle(color: Colors.white)),
+                          )
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // قسم إنشاء منشور جديد (طراز فيسبوك)
+                    Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            backgroundColor: Color(0xFF1877F2),
+                            child: Icon(Icons.person, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _postController,
+                              decoration: const InputDecoration(
+                                hintText: 'بماذا تفكر الآن؟',
+                                border: InputBorder.none,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.send, color: Color(0xFF1877F2)),
+                            onPressed: _submitPost,
+                          )
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // خلاصة المنشورات المتدفقة في الوقت الفعلي
+                    Expanded(
+                      child: _posts.isEmpty
+                          ? const Center(child: Text('لا توجد منشورات حالياً في الشبكة.'))
+                          : ListView.builder(
+                              itemCount: _posts.length,
+                              itemBuilder: (context, index) {
+                                final post = _posts[index];
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                                  color: Colors.white,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const CircleAvatar(radius: 18, child: Icon(Icons.account_circle)),
+                                            const SizedBox(width: 8),
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(post['username'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                Text(post['timestamp'], style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                              ],
+                                            )
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(post['text'] ?? '', style: const TextStyle(fontSize: 15)),
+                                        const Divider(),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                          children: [
+                                            TextButton.icon(
+                                              onPressed: () {},
+                                              icon: const Icon(Icons.thumb_up_outlined, size: 20),
+                                              label: Text('إعجاب (${post['likes']})'),
+                                            ),
+                                            TextButton.icon(
+                                              onPressed: () {},
+                                              icon: const Icon(Icons.mode_comment_outlined, size: 20),
+                                              label: const Text('تعليق'),
+                                            ),
+                                          ],
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
               );
             }
@@ -106,7 +304,6 @@ jobs:
 
       - name: 🛠️ Force Overwrite build.gradle.kts with AGP 9.0+ Specifications
         run: |
-          # تحديث compileSdk لـ 36 وتحديث مكتبة التوافقية لـ 2.1.4 بناءً على طلب نظام أندرويد
           cat << 'EOF' > android/app/build.gradle.kts
           plugins {
               id("com.android.application")
@@ -150,7 +347,6 @@ jobs:
           }
 
           dependencies {
-              // التحديث المطلوب للإصدار المتوافق
               coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
           }
           EOF
