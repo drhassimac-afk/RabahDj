@@ -43,7 +43,7 @@ jobs:
           PERMISSIONS='<uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />'
           sed -i "/<manifest/a \    $PERMISSIONS" android/app/src/main/AndroidManifest.xml
 
-      - name: 📲 Inject Ultimate Social UI (Fixed WebRTC Placeholder)
+      - name: 📲 Inject Ultimate Social UI (Standard Architecture)
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -114,7 +114,6 @@ jobs:
             }
           }
 
-          // --- شاشة المنشورات ---
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
             @override
@@ -325,7 +324,7 @@ jobs:
             }
           }
 
-          // --- شاشة مكالمات الفيديو المصححة والمطابقة لـ 2026 ---
+          // --- شاشة مكالمات الفيديو ---
           class VideoCallScreen extends StatefulWidget {
             const VideoCallScreen({super.key});
             @override
@@ -394,7 +393,6 @@ jobs:
                     Expanded(
                       child: Stack(
                         children: [
-                          // التعديل والإصلاح: استخدام Stack وشرط برمجى بدلاً من باراميتر placeholder المرفوض
                           Positioned.fill(
                             child: _hasRemoteVideo 
                                 ? RTCVideoView(_remoteRenderer)
@@ -428,7 +426,7 @@ jobs:
           }
           EOF
 
-      - name: 🛠️ Force Overwrite build.gradle.kts with AGP 9.0+ Specifications
+      - name: 🛠️ Force Overwrite build.gradle.kts with Maximum Compatibility
         run: |
           cat << 'EOF' > android/app/build.gradle.kts
           plugins {
@@ -455,7 +453,7 @@ jobs:
 
               defaultConfig {
                   applicationId = "com.example.rabahdj_local_app"
-                  minSdk = 21
+                  minSdk = 22
                   targetSdk = 34
                   versionCode = 1
                   versionName = "1.0.0"
@@ -464,6 +462,8 @@ jobs:
               buildTypes {
                   release {
                       signingConfig = signingConfigs.getByName("debug")
+                      isMinifyEnabled = false
+                      isShrinkResources = false
                   }
               }
           }
@@ -489,6 +489,7 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
 
 
 
