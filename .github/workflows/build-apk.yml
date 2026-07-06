@@ -623,6 +623,23 @@ jobs:
           }
           EOF
 
+      - name: 🎨 Inject Custom Branding & App Icon
+        run: |
+          # 1. تخصيص اسم التطبيق ليظهر بـ RabahDj App
+          sed -i 's/android:label=".*"/android:label="RabahDj App"/' android/app/src/main/AndroidManifest.xml
+          
+          # 2. إنشاء أيقونة احترافية بحرف R
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          convert -size 512x512 xc:#1877F2 -fill white -font DejaVu-Sans-Bold -pointsize 300 -gravity center draw "text 0,0 'R'" icon.png
+          
+          mkdir -p android/app/src/main/res/mipmap-mdpi android/app/src/main/res/mipmap-hdpi android/app/src/main/res/mipmap-xhdpi android/app/src/main/res/mipmap-xxhdpi android/app/src/main/res/mipmap-xxxhdpi
+          
+          convert icon.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert icon.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert icon.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert icon.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert icon.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
       - name: 📦 Install Flutter Packages
         run: flutter pub get
 
@@ -632,6 +649,6 @@ jobs:
       - name: 📤 Upload Final APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RabahDj-Flutter-Final-APK
+          name: RabahDj-App-Final
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
