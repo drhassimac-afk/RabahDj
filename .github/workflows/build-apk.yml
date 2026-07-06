@@ -1,4 +1,4 @@
- name: Generate and Build Clean Flutter App
+name: Generate and Build Clean Flutter App
 
 on:
   push:
@@ -489,5 +489,6 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
 
 
