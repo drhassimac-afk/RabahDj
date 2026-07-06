@@ -38,7 +38,7 @@ jobs:
         run: |
           sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2\n  http: ^1.2.0' pubspec.yaml
 
-      - name: 📲 Inject Ultra App UI with Dashboard & Weather AI
+      - name: 📲 Inject Ultra App UI with Chat Rooms & SaaS Dashboard
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -53,14 +53,17 @@ jobs:
           late IO.Socket socket;
           String currentServerIp = "192.168.1.10";
           int globalPostsCount = 0;
+          List<Map<String, dynamic>> globalChatMessages = [];
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+            const InitializationSettings initializationSettings = InitializationSettings(android: androidDetails);
             await _localNotificationsPlugin.initialize(settings: initializationSettings);
             runApp(const MyApp());
           }
+
+          const InitializationSettings initializationSettings = InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'));
 
           class MyApp extends StatelessWidget {
             const MyApp({super.key});
@@ -87,6 +90,7 @@ jobs:
             int _currentIndex = 0;
             final List<Widget> _screens = [
               const HomeScreen(),
+              const ChatScreen(), // شاشة المحادثات الجديدة
               const ReelsScreen(),
               const SaasUltraDashboard(),
             ];
@@ -102,16 +106,19 @@ jobs:
                   },
                   selectedItemColor: const Color(0xFF1877F2),
                   unselectedItemColor: Colors.grey,
+                  type: BottomNavigationBarType.fixed,
                   items: const [
                     BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
+                    BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'الدردشة'),
                     BottomNavigationBarItem(icon: Icon(Icons.movie_filter), label: 'ريلز'),
-                    BottomNavigationBarItem(icon: Icon(Icons.dashboard_customize), label: 'SaaS ULTRA'),
+                    BottomNavigationBarItem(icon: Icon(Icons.dashboard_customize), label: 'SaaS'),
                   ],
                 ),
               );
             }
           }
 
+          // --- شاشة المنشورات ---
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
             @override
@@ -151,6 +158,11 @@ jobs:
                   globalPostsCount = _posts.length;
                 });
                 _triggerLocalNotification('منشور جديد!', data['text'] ?? '');
+              });
+
+              socket.on('newMessage', (data) {
+                globalChatMessages.add(Map<String, dynamic>.from(data));
+                _triggerLocalNotification('رسالة جديدة من ${data['sender']}', data['message'] ?? '');
               });
 
               socket.on('updateOnlineCount', (count) {
@@ -268,6 +280,87 @@ jobs:
             }
           }
 
+          // --- شاشة الدردشة الجماعية الحية ---
+          class ChatScreen extends StatefulWidget {
+            const ChatScreen({super.key});
+            @override
+            State<ChatScreen> createState() => _ChatScreenState();
+          }
+
+          class _ChatScreenState extends State<ChatScreen> {
+            final TextEditingController _msgController = TextEditingController();
+
+            void _sendMessage() {
+              if (_msgController.text.trim().isEmpty) return;
+              final msgData = {
+                'id': const Uuid().v4(),
+                'sender': 'أنا',
+                'message': _msgController.text.trim(),
+                'time': 'الآن'
+              };
+              
+              socket.emit('sendMessage', msgData);
+              setState(() {
+                globalChatMessages.add(msgData);
+              });
+              _msgController.clear();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: const Color(0xFF121212),
+                appBar: AppBar(title: const Text('💬 غرفة الدردشة الحية'), backgroundColor: const Color(0xFF1F2937)),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: globalChatMessages.isEmpty
+                          ? const Center(child: Text('ابدأ الدردشة الفورية الآن مع المتصلين بالشبكة...'))
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(10),
+                              itemCount: globalChatMessages.length,
+                              itemBuilder: (context, index) {
+                                final msg = globalChatMessages[index];
+                                bool isMe = msg['sender'] == 'أنا';
+                                return Align(
+                                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(vertical: 5),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: isMe ? const Color(0xFF1877F2) : const Color(0xFF2A2A2A),
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(msg['sender'], style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 5),
+                                        Text(msg['message'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      color: const Color(0xFF1E1E1E),
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(controller: _msgController, decoration: const InputDecoration(hintText: 'اكتب رسالتك الحية هنا...', border: InputBorder.none))),
+                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF1877F2)), onPressed: _sendMessage),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+              );
+            }
+          }
+
+          // --- شاشة الريلز ---
           class ReelsScreen extends StatelessWidget {
             const ReelsScreen({super.key});
             @override
@@ -327,6 +420,7 @@ jobs:
             }
           }
 
+          // --- شاشة لوحة التحكم الذكية الطقس والمساعد ---
           class SaasUltraDashboard extends StatefulWidget {
             const SaasUltraDashboard({super.key});
             @override
@@ -356,7 +450,7 @@ jobs:
                   } else if (temp < 15) {
                     advice = "الأجواء باردة ورائعة ($temp°C). هذا أفضل وقت لكتابة وحل خوارزميات البرمجة المعقدة! ☕💻";
                   } else {
-                    advice = "الطقس مثالي جداً للإبداع والإنتاجية ($temp°C). استغل هذا الأجواء الخرافية لتطوير ميزات إضافية! 🚀";
+                    advice = "الطقس مثالي جداً للإبداع والإنتاجية ($temp°C). استغل هذه الأجواء الخرافية لتطوير ميزات إضافية! 🚀";
                   }
 
                   setState(() {
@@ -392,7 +486,7 @@ jobs:
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.between,
                               children: [
                                 const Text('🌤️ مساعد الطقس والإنتاجية الذكي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                                 Container(
@@ -517,3 +611,4 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
