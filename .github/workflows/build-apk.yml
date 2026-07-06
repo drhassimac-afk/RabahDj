@@ -36,9 +36,9 @@ jobs:
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
-          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2' pubspec.yaml
+          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2\n  http: ^1.2.0' pubspec.yaml
 
-      - name: 📲 Inject Stable Social UI with Feed & Reels
+      - name: 📲 Inject Ultra App UI with Dashboard & Weather AI
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -46,10 +46,13 @@ jobs:
           import 'package:socket_io_client/socket_io_client.dart' as IO;
           import 'package:uuid/uuid.dart';
           import 'package:video_player/video_player.dart';
+          import 'package:http/http.dart' as http;
+          import 'dart:convert';
 
           final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
           late IO.Socket socket;
           String currentServerIp = "192.168.1.10";
+          int globalPostsCount = 0;
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
@@ -66,7 +69,7 @@ jobs:
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData(
-                  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2)),
+                  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2), brightness: Brightness.dark),
                   useMaterial3: true,
                 ),
                 home: const MainNavigationScreen(),
@@ -85,6 +88,7 @@ jobs:
             final List<Widget> _screens = [
               const HomeScreen(),
               const ReelsScreen(),
+              const SaasUltraDashboard(), // واجهة التحكم والمساعد الذكي الجديدة
             ];
 
             @override
@@ -97,15 +101,18 @@ jobs:
                     setState(() { _currentIndex = index; });
                   },
                   selectedItemColor: const Color(0xFF1877F2),
+                  unselectedItemColor: Colors.grey,
                   items: const [
                     BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
-                    BottomNavigationBarItem(icon: Icon(Icons.movie_filter), label: 'ريلز المحلية'),
+                    BottomNavigationBarItem(icon: Icon(Icons.movie_filter), label: 'ريلز'),
+                    BottomNavigationBarItem(icon: Icon(Icons.dashboard_customize), label: 'SaaS ULTRA'),
                   ],
                 ),
               );
             }
           }
 
+          // --- شاشة المنشورات ---
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
             @override
@@ -140,7 +147,10 @@ jobs:
               });
 
               socket.on('newPost', (data) {
-                setState(() { _posts.insert(0, Map<String, dynamic>.from(data)); });
+                setState(() { 
+                  _posts.insert(0, Map<String, dynamic>.from(data)); 
+                  globalPostsCount = _posts.length;
+                });
                 _triggerLocalNotification('منشور جديد!', data['text'] ?? '');
               });
 
@@ -162,7 +172,10 @@ jobs:
               if (_isConnected) {
                 socket.emit('createPost', newPost);
               } else {
-                setState(() { _posts.insert(0, newPost); });
+                setState(() { 
+                  _posts.insert(0, newPost); 
+                  globalPostsCount = _posts.length;
+                });
               }
               _postController.clear();
             }
@@ -179,7 +192,7 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                backgroundColor: const Color(0xFFF0F2F5),
+                backgroundColor: const Color(0xFF121212),
                 appBar: AppBar(
                   backgroundColor: const Color(0xFF1877F2),
                   title: const Text('RabahDj Local Network', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -193,7 +206,7 @@ jobs:
                 body: Column(
                   children: [
                     Container(
-                      color: Colors.white,
+                      color: const Color(0xFF1E1E1E),
                       padding: const EdgeInsets.all(10.0),
                       child: Row(
                         children: [
@@ -214,7 +227,7 @@ jobs:
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      color: Colors.white,
+                      color: const Color(0xFF1E1E1E),
                       padding: const EdgeInsets.all(12.0),
                       child: Row(
                         children: [
@@ -234,7 +247,7 @@ jobs:
                                 final post = _posts[index];
                                 return Card(
                                   margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                                  color: Colors.white,
+                                  color: const Color(0xFF1E1E1E),
                                   child: Padding(
                                     padding: const EdgeInsets.all(12.0),
                                     child: Column(
@@ -256,9 +269,9 @@ jobs:
             }
           }
 
+          // --- شاشة الريلز ---
           class ReelsScreen extends StatelessWidget {
             const ReelsScreen({super.key});
-
             @override
             Widget build(BuildContext context) {
               final List<String> localReelsUrls = [
@@ -266,7 +279,6 @@ jobs:
                 "http://$currentServerIp:4000/videos/reel2.mp4",
                 "http://$currentServerIp:4000/videos/reel3.mp4",
               ];
-
               return Scaffold(
                 backgroundColor: Colors.black,
                 body: PageView.builder(
@@ -284,7 +296,6 @@ jobs:
             final String videoUrl;
             final int reelIndex;
             const ReelVideoPlayer({super.key, required this.videoUrl, required this.reelIndex});
-
             @override
             State<ReelVideoPlayer> createState() => _ReelVideoPlayerState();
           }
@@ -292,7 +303,6 @@ jobs:
           class _ReelVideoPlayerState extends State<ReelVideoPlayer> {
             late VideoPlayerController _controller;
             bool _isInitialized = false;
-
             @override
             void initState() {
               super.initState();
@@ -305,43 +315,150 @@ jobs:
                   });
                 });
             }
-
             @override
-            void dispose() {
-              _controller.dispose();
-              super.dispose();
-            }
-
+            void dispose() { _controller.dispose(); super.dispose(); }
             @override
             Widget build(BuildContext context) {
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  _isInitialized
-                      ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller))
-                      : const Center(child: CircularProgressIndicator(color: Colors.white)),
-                  Positioned(
-                    right: 15,
-                    bottom: 100,
-                    child: Column(
-                      children: [
-                        IconButton(icon: const Icon(Icons.favorite, color: Colors.white, size: 35), onPressed: () {}),
-                        const Text('1.2k', style: TextStyle(color: Colors.white)),
-                        const SizedBox(height: 15),
-                        IconButton(icon: const Icon(Icons.comment, color: Colors.white, size: 35), onPressed: () {}),
-                        const Text('84', style: TextStyle(color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    left: 15,
-                    bottom: 30,
-                    child: Text(
-                      'فيديو محلي #${widget.reelIndex}\nبث مباشر عبر الواي فاي بسرعة فائقة',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ),
+                  _isInitialized ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller)) : const Center(child: CircularProgressIndicator(color: Colors.white)),
+                  Positioned(left: 15, bottom: 30, child: Text('فيديو محلي #${widget.reelIndex}\nبث مباشر عبر الواي فاي', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                 ],
+              );
+            }
+          }
+
+          // --- شاشة SaaS ULTRA الـ Dashboard الذكية للموبايل ---
+          class SaasUltraDashboard extends StatefulWidget {
+            const SaasUltraDashboard({super.key});
+            @override
+            State<SaasUltraDashboard> createState() => _SaasUltraDashboardState();
+          }
+
+          class _SaasUltraDashboardState extends State<SaasUltraDashboard> {
+            String _weatherTemp = "تحميل...";
+            String _aiAdvice = "جاري استشارة مساعد الإنتاجية الذكي...";
+
+            @override
+            void initState() {
+              super.initState();
+              _fetchWeatherAndProductivity();
+            }
+
+            Future<void> _fetchWeatherAndProductivity() async {
+              try {
+                // جلب الطقس الحي مباشرة من داخل التطبيق
+                final response = await http.get(Uri.parse("https://api.open-meteo.com/v1/forecast?latitude=36.75&longitude=3.05&current_weather=true"));
+                if (response.statusCode == 200) {
+                  final data = jsonDecode(response.json());
+                  final double temp = data["current_weather"]["temperature"];
+                  
+                  String advice = "";
+                  if (temp > 30) {
+                    advice = "الطقس حار الآن ($temp°C). ركّز على المهام الخفيفة، وحافظ على رطوبة جسمك بشرب الماء! 💧";
+                  } else if (temp < 15) {
+                    advice = "الأجواء باردة ورائعة ($temp°C). هذا أفضل وقت لكتابة وحل خوارزميات البرمجة المعقدة! ☕💻";
+                  } else {
+                    advice = "الطقس مثالي جداً للإبداع والإنتاجية ($temp°C). استغل هذا النشاط لتطوير ميزات إضافية! 🚀";
+                  }
+
+                  setState(() {
+                    _weatherTemp = "$temp°C";
+                    _aiAdvice = advice;
+                  });
+                }
+              } catch (_) {
+                setState(() {
+                  _weatherTemp = "24°C";
+                  _aiAdvice = "مساعد الإنتاجية: حافظ على تنظيم وقتك وجدول مهامك اليومية بذكاء وانطلق! ⚡";
+                });
+              }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: const Color(0xFF121212),
+                appBar: AppBar(title: const Text('🔥 SaaS ULTRA Dashboard'), backgroundColor: const Color(0xFF1F2937)),
+                body: RefreshIndicator(
+                  onRefresh: _fetchWeatherAndProductivity,
+                  child: ListView(
+                    padding: const EdgeInsets.all(15.0),
+                    children: [
+                      // كارت المساعد الذكي والطقس بتصميم متدرج مميز
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Colors.blueAccent, Colors.indigo]),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.between,
+                              children: [
+                                const Text('🌤️ مساعد الطقس والإنتاجية الذكي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, py: 5),
+                                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10)),
+                                  child: Text(_weatherTemp, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                )
+                              ],
+                            ),
+                            const SizedBox(height: 15),
+                            Text(_aiAdvice, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text('📊 إحصائيات النشاط الحي الحالية', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      
+                      // شبكة الإحصائيات
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 1.5,
+                        children: [
+                          _buildStatCard('إجمالي المنشورات', '$globalPostsCount', Icons.paper_plane, Colors.green),
+                          _buildStatCard('المستخدمين', '1 متصل', Icons.people, Colors.blue),
+                          _buildStatCard('حالة النظام', 'Active', Icons.dns, Colors.amber),
+                          _buildStatCard('سرعة البث', 'WiFi Direct', Icons.speed, Colors.purple),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+              return Card(
+                color: const Color(0xFF1E1E1E),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  key: ValueKey(value),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.between,
+                        children: [
+                          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Icon(icon, color: color, size: 20),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
               );
             }
           }
@@ -408,8 +525,3 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
-
-
-
-
-
