@@ -1,4 +1,4 @@
-name: Generate and Build Clean Flutter App
+ name: Generate and Build Clean Flutter App
 
 on:
   push:
@@ -36,16 +36,14 @@ jobs:
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
-          # إضافة حزمة مكالمات الفيديو المباشرة flutter_webrtc إلى جانب الحزم السابقة
           sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2\n  flutter_webrtc: ^0.12.3' pubspec.yaml
 
       - name: 🔏 Inject Android Permissions (Camera & Microphone)
         run: |
-          # حقن صلاحيات استخدام الكاميرا والميكروفون والإنترنت المحلي داخل ملف أندرويد الرئيسي
           PERMISSIONS='<uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />'
           sed -i "/<manifest/a \    $PERMISSIONS" android/app/src/main/AndroidManifest.xml
 
-      - name: 📲 Inject Ultimate Social UI with Video Calling, Reels & Feed
+      - name: 📲 Inject Ultimate Social UI (Fixed WebRTC Placeholder)
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -93,7 +91,7 @@ jobs:
             final List<Widget> _screens = [
               const HomeScreen(),
               const ReelsScreen(),
-              const VideoCallScreen(), // تبويب مكالمات الفيديو الجديد
+              const VideoCallScreen(),
             ];
 
             @override
@@ -327,7 +325,7 @@ jobs:
             }
           }
 
-          // --- شاشة مكالمات الفيديو المباشرة باستخدام WebRTC لعام 2026 ---
+          // --- شاشة مكالمات الفيديو المصححة والمطابقة لـ 2026 ---
           class VideoCallScreen extends StatefulWidget {
             const VideoCallScreen({super.key});
             @override
@@ -339,6 +337,7 @@ jobs:
             final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
             MediaStream? _localStream;
             bool _inCall = false;
+            bool _hasRemoteVideo = false;
 
             @override
             void initState() {
@@ -358,11 +357,10 @@ jobs:
               super.dispose();
             }
 
-            // تشغيل الكاميرا والميكروفون محلياً وبث الإشارة
             void _startCall() async {
               final Map<String, dynamic> mediaConstraints = {
                 'audio': true,
-                'video': {'facingMode': 'user'} // تشغيل الكاميرا الأمامية
+                'video': {'facingMode': 'user'}
               };
 
               _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
@@ -372,7 +370,6 @@ jobs:
                 _inCall = true;
               });
 
-              // إرسال إشارة للسيرفر بأن هذا الهاتف بدأ مكالمة فيديو بالشبكة
               try {
                 socket.emit('startVideoCall', {'status': 'calling'});
               } catch (_) {}
@@ -383,6 +380,7 @@ jobs:
               _localRenderer.srcObject = null;
               setState(() {
                 _inCall = false;
+                _hasRemoteVideo = false;
               });
             }
 
@@ -396,12 +394,18 @@ jobs:
                     Expanded(
                       child: Stack(
                         children: [
-                          // عرض الكاميرا البعيدة (الشخص الآخر)
-                          Positioned.fill(child: RTCVideoView(_remoteRenderer, placeholder: Container(color: Colors.black54, child: const Center(child: Text('بانتظار طرف آخر...', style: TextStyle(color: Colors.white)))))),
-                          // عرض كاميرتك المحلية في نافذة صغيرة عائمة بالزاوية
+                          // التعديل والإصلاح: استخدام Stack وشرط برمجى بدلاً من باراميتر placeholder المرفوض
+                          Positioned.fill(
+                            child: _hasRemoteVideo 
+                                ? RTCVideoView(_remoteRenderer)
+                                : Container(color: Colors.black54, child: const Center(child: Text('بانتظار طرف آخر في الواي فاي...', style: TextStyle(color: Colors.white, fontSize: 16)))),
+                          ),
                           Positioned(
                             right: 20, top: 20, width: 120, height: 160,
-                            child: Container(color: Colors.black, child: RTCVideoView(_localRenderer, mirror: true)),
+                            child: Container(
+                              decoration: BoxDecoration(border: Border.all(color: Colors.white24, width: 2), color: Colors.black),
+                              child: RTCVideoView(_localRenderer, mirror: true),
+                            ),
                           ),
                         ],
                       ),
@@ -485,4 +489,5 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
 
