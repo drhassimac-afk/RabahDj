@@ -36,10 +36,9 @@ jobs:
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
-          # إضافة حزمة تشغيل الفيديو (video_player) إلى جانب الحزم السابقة
           sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2' pubspec.yaml
 
-      - name: 📲 Inject Full Social UI with Local Reels Feature
+      - name: 📲 Inject Full Social UI with Local Reels Feature (Fixed Parameters)
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -75,7 +74,6 @@ jobs:
             }
           }
 
-          // شاشة التنقل الرئيسية (المنشورات والريلز)
           class MainNavigationScreen extends StatefulWidget {
             const MainNavigationScreen({super.key});
             @override
@@ -110,7 +108,6 @@ jobs:
             }
           }
 
-          // --- شاشة المنشورات (القديمة المحدثة) ---
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
             @override
@@ -181,8 +178,13 @@ jobs:
               const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
                 'rabahdj_channels', 'RabahDj', importance: Importance.max, priority: Priority.high
               );
+              
+              // التعديل والإصلاح: استخدام المعاملات المسمّاة الإلزامية في الإصدار الجديد
               await _localNotificationsPlugin.show(
-                DateTime.now().millisecond, title, body, const NotificationDetails(android: androidDetails),
+                id: DateTime.now().millisecond,
+                title: title,
+                body: body,
+                notificationDetails: const NotificationDetails(android: androidDetails),
               );
             }
 
@@ -266,13 +268,11 @@ jobs:
             }
           }
 
-          // --- شاشة الريلز الذكية (TikTok Style) ---
           class ReelsScreen extends StatelessWidget {
             const ReelsScreen({super.key});
 
             @override
             Widget build(BuildContext context) {
-              // روابط الفيديوهات ستشير تلقائياً إلى المجلد المحلي على السيرفر عبر الواي فاي
               final List<String> localReelsUrls = [
                 "http://$currentServerIp:4000/videos/reel1.mp4",
                 "http://$currentServerIp:4000/videos/reel2.mp4",
@@ -282,7 +282,7 @@ jobs:
               return Scaffold(
                 backgroundColor: Colors.black,
                 body: PageView.builder(
-                  scrollDirection: Axis.vertical, // التمرير عمودياً مثل ريلز الحقيقي
+                  scrollDirection: Axis.vertical,
                   itemCount: localReelsUrls.length,
                   itemBuilder: (context, index) {
                     return ReelVideoPlayer(videoUrl: localReelsUrls[index], reelIndex: index + 1);
@@ -292,7 +292,6 @@ jobs:
             }
           }
 
-          // متحكم تشغيل الفيديو الفردي داخل الريلز
           class ReelVideoPlayer extends StatefulWidget {
             final String videoUrl;
             final int reelIndex;
@@ -309,20 +308,19 @@ jobs:
             @override
             void initState() {
               super.initState();
-              // تشغيل البث المباشر للفيديو من السيرفر المحلي للواي فاي
               _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
                 ..initialize().then((_) {
                   setState(() {
                     _isInitialized = true;
-                    _controller.setLooping(true); // إعادة تشغيل الفيديو تلقائياً
-                    _controller.play(); // تشغيل فوري عند التمرير إليه
+                    _controller.setLooping(true);
+                    _controller.play();
                   });
                 });
             }
 
             @override
             void dispose() {
-              _controller.dispose(); // إغلاق الفيديو فور مغادرته لتوفير ذاكرة الهاتف
+              _controller.dispose();
               super.dispose();
             }
 
@@ -334,7 +332,6 @@ jobs:
                   _isInitialized
                       ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller))
                       : const Center(child: CircularProgressIndicator(color: Colors.white)),
-                  // واجهة الأزرار الجانبية فوق الفيديو (إعجاب، تعليق، مشاركة)
                   Positioned(
                     right: 15,
                     bottom: 100,
@@ -348,7 +345,6 @@ jobs:
                       ],
                     ),
                   ),
-                  // اسم ناشر الريلز في الأسفل
                   Positioned(
                     left: 15,
                     bottom: 30,
@@ -363,7 +359,7 @@ jobs:
           }
           EOF
 
-      - name: 🛠 * Force Overwrite build.gradle.kts with AGP 9.0+ Specifications
+      - name: 🛠️ Force Overwrite build.gradle.kts with AGP 9.0+ Specifications
         run: |
           cat << 'EOF' > android/app/build.gradle.kts
           plugins {
@@ -424,5 +420,3 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
-
-          
