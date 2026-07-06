@@ -158,7 +158,9 @@ jobs:
               });
 
               socket.on('newMessage', (data) {
-                globalChatMessages.add(Map<String, dynamic>.from(data));
+                setState(() {
+                  globalChatMessages.add(Map<String, dynamic>.from(data));
+                });
                 _triggerLocalNotification('رسالة جديدة من ${data['sender']}', data['message'] ?? '');
               });
 
@@ -561,7 +563,7 @@ jobs:
                   isCoreLibraryDesugaringEnabled = true
                   sourceCompatibility = JavaVersion.VERSION_1_8
                   targetCompatibility = JavaVersion.VERSION_1_8
-              }
+                }
 
               tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
                   compilerOptions {
@@ -605,5 +607,62 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
+      - name: 🗄️ Auto-Generate Backend NodeJS Server Code (server.js)
+        run: |
+          cat << 'EOF' > server.js
+          const express = require('express');
+          const http = require('http');
+          const { Server } = require('socket.io');
+          const cors = require('cors');
+
+          const app = express();
+          app.use(cors());
+          app.use(express.json());
+
+          const server = http.createServer(app);
+          const io = new Server(server, {
+              cors: { origin: "*", methods: ["GET", "POST"] }
+          });
+
+          let onlineUsersCount = 0;
+
+          io.on('connection', (socket) => {
+              onlineUsersCount++;
+              io.emit('updateOnlineCount', onlineUsersCount);
+              console.log(`⚡ مستخدم متصل جديد. الإجمالي: ${onlineUsersCount}`);
+
+              // إدارة بث المنشورات الجديدة حياً
+              socket.on('createPost', (postData) => {
+                  socket.broadcast.emit('newPost', postData);
+              });
+
+              // إدارة بث رسائل الدردشة الفورية حياً
+              socket.on('sendMessage', (msgData) => {
+                  socket.broadcast.emit('newMessage', msgData);
+              });
+
+              socket.on('disconnect', () => {
+                  onlineUsersCount = Math.max(0, onlineUsersCount - 1);
+                  io.emit('updateOnlineCount', onlineUsersCount);
+                  console.log(`❌ مستخدم غادر الشبكة. المتبقي: ${onlineUsersCount}`);
+              });
+          });
+
+          // تشغيل السيرفر على المنفذ 4000 المعتمد داخل تطبيق الفلاتر
+          const PORT = 4000;
+          server.listen(PORT, '0.0.0.0', () => {
+              console.log(`🚀 السيرفر الخلفي الذكي يعمل بنجاح على http://localhost:${PORT}`);
+          });
+          EOF
+
+      - name: 🔄 Automatically Commit Server File back to Repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add server.js
+          git commit -m "🗄️ Inject production Node.js socket server script" || true
+          git push origin main || true
+
 
 
