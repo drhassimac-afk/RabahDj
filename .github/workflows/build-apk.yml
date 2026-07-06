@@ -58,12 +58,10 @@ jobs:
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-            const InitializationSettings initializationSettings = InitializationSettings(android: androidDetails);
+            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             await _localNotificationsPlugin.initialize(settings: initializationSettings);
             runApp(const MyApp());
           }
-
-          const InitializationSettings initializationSettings = InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'));
 
           class MyApp extends StatelessWidget {
             const MyApp({super.key});
@@ -90,7 +88,7 @@ jobs:
             int _currentIndex = 0;
             final List<Widget> _screens = [
               const HomeScreen(),
-              const ChatScreen(), // شاشة المحادثات الجديدة
+              const ChatScreen(),
               const ReelsScreen(),
               const SaasUltraDashboard(),
             ];
@@ -118,7 +116,6 @@ jobs:
             }
           }
 
-          // --- شاشة المنشورات ---
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
             @override
@@ -280,7 +277,6 @@ jobs:
             }
           }
 
-          // --- شاشة الدردشة الجماعية الحية ---
           class ChatScreen extends StatefulWidget {
             const ChatScreen({super.key});
             @override
@@ -360,7 +356,6 @@ jobs:
             }
           }
 
-          // --- شاشة الريلز ---
           class ReelsScreen extends StatelessWidget {
             const ReelsScreen({super.key});
             @override
@@ -420,7 +415,6 @@ jobs:
             }
           }
 
-          // --- شاشة لوحة التحكم الذكية الطقس والمساعد ---
           class SaasUltraDashboard extends StatefulWidget {
             const SaasUltraDashboard({super.key});
             @override
@@ -486,7 +480,7 @@ jobs:
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.between,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('🌤️ مساعد الطقس والإنتاجية الذكي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                                 Container(
@@ -611,4 +605,5 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
 
