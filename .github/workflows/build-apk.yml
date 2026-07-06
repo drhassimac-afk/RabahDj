@@ -36,9 +36,16 @@ jobs:
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
-          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2' pubspec.yaml
+          # إضافة حزمة مكالمات الفيديو المباشرة flutter_webrtc إلى جانب الحزم السابقة
+          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2\n  flutter_webrtc: ^0.12.3' pubspec.yaml
 
-      - name: 📲 Inject Full Social UI with Local Reels Feature (Fixed Parameters)
+      - name: 🔏 Inject Android Permissions (Camera & Microphone)
+        run: |
+          # حقن صلاحيات استخدام الكاميرا والميكروفون والإنترنت المحلي داخل ملف أندرويد الرئيسي
+          PERMISSIONS='<uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />'
+          sed -i "/<manifest/a \    $PERMISSIONS" android/app/src/main/AndroidManifest.xml
+
+      - name: 📲 Inject Ultimate Social UI with Video Calling, Reels & Feed
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -46,6 +53,7 @@ jobs:
           import 'package:socket_io_client/socket_io_client.dart' as IO;
           import 'package:uuid/uuid.dart';
           import 'package:video_player/video_player.dart';
+          import 'package:flutter_webrtc/flutter_webrtc.dart';
 
           final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
           late IO.Socket socket;
@@ -85,6 +93,7 @@ jobs:
             final List<Widget> _screens = [
               const HomeScreen(),
               const ReelsScreen(),
+              const VideoCallScreen(), // تبويب مكالمات الفيديو الجديد
             ];
 
             @override
@@ -94,20 +103,20 @@ jobs:
                 bottomNavigationBar: BottomNavigationBar(
                   currentIndex: _currentIndex,
                   onTap: (index) {
-                    setState(() {
-                      _currentIndex = index;
-                    });
+                    setState(() { _currentIndex = index; });
                   },
                   selectedItemColor: const Color(0xFF1877F2),
                   items: const [
                     BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
-                    BottomNavigationBarItem(icon: Icon(Icons.movie_filter), label: 'ريلز المحلية'),
+                    BottomNavigationBarItem(icon: Icon(Icons.movie_filter), label: 'ريلز'),
+                    BottomNavigationBarItem(icon: Icon(Icons.video_call), label: 'مكالمة فيديو'),
                   ],
                 ),
               );
             }
           }
 
+          // --- شاشة المنشورات ---
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
             @override
@@ -120,11 +129,6 @@ jobs:
             final List<Map<String, dynamic>> _posts = [];
             bool _isConnected = false;
             int _onlineCount = 1;
-
-            @override
-            void initState() {
-              super.initState();
-            }
 
             void _connectToLocalServer() {
               currentServerIp = _ipController.text.trim();
@@ -178,13 +182,8 @@ jobs:
               const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
                 'rabahdj_channels', 'RabahDj', importance: Importance.max, priority: Priority.high
               );
-              
-              // التعديل والإصلاح: استخدام المعاملات المسمّاة الإلزامية في الإصدار الجديد
               await _localNotificationsPlugin.show(
-                id: DateTime.now().millisecond,
-                title: title,
-                body: body,
-                notificationDetails: const NotificationDetails(android: androidDetails),
+                id: DateTime.now().millisecond, title: title, body: body, notificationDetails: const NotificationDetails(android: androidDetails),
               );
             }
 
@@ -268,9 +267,9 @@ jobs:
             }
           }
 
+          // --- شاشة الريلز ---
           class ReelsScreen extends StatelessWidget {
             const ReelsScreen({super.key});
-
             @override
             Widget build(BuildContext context) {
               final List<String> localReelsUrls = [
@@ -278,7 +277,6 @@ jobs:
                 "http://$currentServerIp:4000/videos/reel2.mp4",
                 "http://$currentServerIp:4000/videos/reel3.mp4",
               ];
-
               return Scaffold(
                 backgroundColor: Colors.black,
                 body: PageView.builder(
@@ -296,7 +294,6 @@ jobs:
             final String videoUrl;
             final int reelIndex;
             const ReelVideoPlayer({super.key, required this.videoUrl, required this.reelIndex});
-
             @override
             State<ReelVideoPlayer> createState() => _ReelVideoPlayerState();
           }
@@ -304,7 +301,6 @@ jobs:
           class _ReelVideoPlayerState extends State<ReelVideoPlayer> {
             late VideoPlayerController _controller;
             bool _isInitialized = false;
-
             @override
             void initState() {
               super.initState();
@@ -317,43 +313,112 @@ jobs:
                   });
                 });
             }
-
             @override
-            void dispose() {
-              _controller.dispose();
-              super.dispose();
-            }
-
+            void dispose() { _controller.dispose(); super.dispose(); }
             @override
             Widget build(BuildContext context) {
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  _isInitialized
-                      ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller))
-                      : const Center(child: CircularProgressIndicator(color: Colors.white)),
-                  Positioned(
-                    right: 15,
-                    bottom: 100,
-                    child: Column(
-                      children: [
-                        IconButton(icon: const Icon(Icons.favorite, color: Colors.white, size: 35), onPressed: () {}),
-                        const Text('1.2k', style: TextStyle(color: Colors.white)),
-                        const SizedBox(height: 15),
-                        IconButton(icon: const Icon(Icons.comment, color: Colors.white, size: 35), onPressed: () {}),
-                        const Text('84', style: TextStyle(color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    left: 15,
-                    bottom: 30,
-                    child: Text(
-                      'فيديو محلي #${widget.reelIndex}\nبث مباشر عبر الواي فاي بسرعة 0MB',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ),
+                  _isInitialized ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller)) : const Center(child: CircularProgressIndicator(color: Colors.white)),
+                  Positioned(left: 15, bottom: 30, child: Text('فيديو محلي #${widget.reelIndex}\nبث مباشر عبر الواي فاي بسرعة 0MB', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                 ],
+              );
+            }
+          }
+
+          // --- شاشة مكالمات الفيديو المباشرة باستخدام WebRTC لعام 2026 ---
+          class VideoCallScreen extends StatefulWidget {
+            const VideoCallScreen({super.key});
+            @override
+            State<VideoCallScreen> createState() => _VideoCallScreenState();
+          }
+
+          class _VideoCallScreenState extends State<VideoCallScreen> {
+            final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+            final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+            MediaStream? _localStream;
+            bool _inCall = false;
+
+            @override
+            void initState() {
+              super.initState();
+              _initRenderers();
+            }
+
+            void _initRenderers() async {
+              await _localRenderer.initialize();
+              await _remoteRenderer.initialize();
+            }
+
+            @override
+            void dispose() {
+              _localRenderer.dispose();
+              _remoteRenderer.dispose();
+              super.dispose();
+            }
+
+            // تشغيل الكاميرا والميكروفون محلياً وبث الإشارة
+            void _startCall() async {
+              final Map<String, dynamic> mediaConstraints = {
+                'audio': true,
+                'video': {'facingMode': 'user'} // تشغيل الكاميرا الأمامية
+              };
+
+              _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+              _localRenderer.srcObject = _localStream;
+
+              setState(() {
+                _inCall = true;
+              });
+
+              // إرسال إشارة للسيرفر بأن هذا الهاتف بدأ مكالمة فيديو بالشبكة
+              try {
+                socket.emit('startVideoCall', {'status': 'calling'});
+              } catch (_) {}
+            }
+
+            void _endCall() {
+              _localStream?.getTracks().forEach((track) => track.stop());
+              _localRenderer.srcObject = null;
+              setState(() {
+                _inCall = false;
+              });
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: Colors.grey[900],
+                appBar: AppBar(title: const Text('مكالمات فيديو P2P (بدون إنترنت)'), backgroundColor: const Color(0xFF1877F2)),
+                body: Column(
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          // عرض الكاميرا البعيدة (الشخص الآخر)
+                          Positioned.fill(child: RTCVideoView(_remoteRenderer, placeholder: Container(color: Colors.black54, child: const Center(child: Text('بانتظار طرف آخر...', style: TextStyle(color: Colors.white)))))),
+                          // عرض كاميرتك المحلية في نافذة صغيرة عائمة بالزاوية
+                          Positioned(
+                            right: 20, top: 20, width: 120, height: 160,
+                            child: Container(color: Colors.black, child: RTCVideoView(_localRenderer, mirror: true)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _inCall
+                              ? FloatingActionButton(onPressed: _endCall, backgroundColor: Colors.red, child: const Icon(Icons.call_end, color: Colors.white))
+                              : FloatingActionButton(onPressed: _startCall, backgroundColor: Colors.green, child: const Icon(Icons.video_call, color: Colors.white)),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
               );
             }
           }
@@ -420,3 +485,4 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
