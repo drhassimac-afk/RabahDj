@@ -623,8 +623,8 @@ jobs:
           }
           EOF
 
-     - name: 🎨 Inject Custom Branding & App Icon
-       run: |
+      - name: 🎨 Inject Custom Branding & App Icon
+        run: |
           # 1. تخصيص اسم التطبيق ليظهر بـ RabahDj App
           sed -i 's/android:label=".*"/android:label="RabahDj App"/' android/app/src/main/AndroidManifest.xml
           
