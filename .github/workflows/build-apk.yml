@@ -36,18 +36,21 @@ jobs:
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
-          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3' pubspec.yaml
+          # إضافة حزمة تشغيل الفيديو (video_player) إلى جانب الحزم السابقة
+          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2' pubspec.yaml
 
-      - name: 📲 Inject Professional Social Media Feed UI & Socket Code (Fixed Parameters)
+      - name: 📲 Inject Full Social UI with Local Reels Feature
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
           import 'package:flutter_local_notifications/flutter_local_notifications.dart';
           import 'package:socket_io_client/socket_io_client.dart' as IO;
           import 'package:uuid/uuid.dart';
+          import 'package:video_player/video_player.dart';
 
           final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
           late IO.Socket socket;
+          String currentServerIp = "192.168.1.10";
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
@@ -67,11 +70,47 @@ jobs:
                   colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2)),
                   useMaterial3: true,
                 ),
-                home: const HomeScreen(),
+                home: const MainNavigationScreen(),
               );
             }
           }
 
+          // شاشة التنقل الرئيسية (المنشورات والريلز)
+          class MainNavigationScreen extends StatefulWidget {
+            const MainNavigationScreen({super.key});
+            @override
+            State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+          }
+
+          class _MainNavigationScreenState extends State<MainNavigationScreen> {
+            int _currentIndex = 0;
+            final List<Widget> _screens = [
+              const HomeScreen(),
+              const ReelsScreen(),
+            ];
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                body: _screens[_currentIndex],
+                bottomNavigationBar: BottomNavigationBar(
+                  currentIndex: _currentIndex,
+                  onTap: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                  selectedItemColor: const Color(0xFF1877F2),
+                  items: const [
+                    BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
+                    BottomNavigationBarItem(icon: Icon(Icons.movie_filter), label: 'ريلز المحلية'),
+                  ],
+                ),
+              );
+            }
+          }
+
+          // --- شاشة المنشورات (القديمة المحدثة) ---
           class HomeScreen extends StatefulWidget {
             const HomeScreen({super.key});
             @override
@@ -79,7 +118,7 @@ jobs:
           }
 
           class _HomeScreenState extends State<HomeScreen> {
-            final TextEditingController _ipController = TextEditingController(text: "192.168.1.10");
+            final TextEditingController _ipController = TextEditingController(text: currentServerIp);
             final TextEditingController _postController = TextEditingController();
             final List<Map<String, dynamic>> _posts = [];
             bool _isConnected = false;
@@ -88,11 +127,11 @@ jobs:
             @override
             void initState() {
               super.initState();
-              _triggerLocalNotification('مرحباً بك في RabahDj', 'تطبيق الشبكة المحلية جاهز للاتصال 🟢');
             }
 
             void _connectToLocalServer() {
-              String serverUrl = "http://${_ipController.text.trim()}:4000";
+              currentServerIp = _ipController.text.trim();
+              String serverUrl = "http://$currentServerIp:4000";
               
               socket = IO.io(serverUrl, IO.OptionBuilder()
                 .setTransports(['websocket'])
@@ -102,35 +141,26 @@ jobs:
               socket.connect();
 
               socket.onConnect((_) {
-                setState(() {
-                  _isConnected = true;
-                });
-                _triggerLocalNotification('تم الاتصال!', 'أنت الآن متصل بالسيرفر المحلي بنجاح 🌐');
+                setState(() { _isConnected = true; });
+                _triggerLocalNotification('تم الاتصال!', 'أنت متصل بالشبكة المحلية لـ RabahDj 🌐');
               });
 
               socket.onDisconnect((_) {
-                setState(() {
-                  _isConnected = false;
-                });
+                setState(() { _isConnected = false; });
               });
 
               socket.on('newPost', (data) {
-                setState(() {
-                  _posts.insert(0, Map<String, dynamic>.from(data));
-                });
-                _triggerLocalNotification('منشور جديد من الشبكة!', data['text'] ?? '');
+                setState(() { _posts.insert(0, Map<String, dynamic>.from(data)); });
+                _triggerLocalNotification('منشور جديد!', data['text'] ?? '');
               });
 
               socket.on('updateOnlineCount', (count) {
-                setState(() {
-                  _onlineCount = count;
-                });
+                setState(() { _onlineCount = count; });
               });
             }
 
             void _submitPost() {
               if (_postController.text.trim().isEmpty) return;
-
               final newPost = {
                 'id': const Uuid().v4(),
                 'username': 'مستخدم محلي',
@@ -142,25 +172,17 @@ jobs:
               if (_isConnected) {
                 socket.emit('createPost', newPost);
               } else {
-                setState(() {
-                  _posts.insert(0, newPost);
-                });
+                setState(() { _posts.insert(0, newPost); });
               }
               _postController.clear();
             }
 
             Future<void> _triggerLocalNotification(String title, String body) async {
               const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-                'rabahdj_local_channels', 'RabahDj Notifications',
-                importance: Importance.max, priority: Priority.high
+                'rabahdj_channels', 'RabahDj', importance: Importance.max, priority: Priority.high
               );
-              
-              // التعديل السحري هنا: استخدام المعاملات المسمّاة الإلزامية في v22 منعا لخطأ الـ Compiler
               await _localNotificationsPlugin.show(
-                id: DateTime.now().millisecond,
-                title: title,
-                body: body,
-                notificationDetails: const NotificationDetails(android: androidDetails),
+                DateTime.now().millisecond, title, body, const NotificationDetails(android: androidDetails),
               );
             }
 
@@ -174,12 +196,7 @@ jobs:
                   actions: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Center(
-                        child: Text(
-                          _isConnected ? '🟢 متصل ($_onlineCount)' : '🔴 منفصل',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                      child: Center(child: Text(_isConnected ? '🟢 متصل ($_onlineCount)' : '🔴 منفصل', style: const TextStyle(color: Colors.white))),
                     )
                   ],
                 ),
@@ -193,11 +210,7 @@ jobs:
                           Expanded(
                             child: TextField(
                               controller: _ipController,
-                              decoration: const InputDecoration(
-                                labelText: 'عنوان IP السيرفر المحلي',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
+                              decoration: const InputDecoration(labelText: 'عنوان IP السيرفر', border: OutlineInputBorder(), isDense: true),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -215,31 +228,16 @@ jobs:
                       padding: const EdgeInsets.all(12.0),
                       child: Row(
                         children: [
-                          const CircleAvatar(
-                            backgroundColor: Color(0xFF1877F2),
-                            child: Icon(Icons.person, color: Colors.white),
-                          ),
+                          const CircleAvatar(backgroundColor: Color(0xFF1877F2), child: Icon(Icons.person, color: Colors.white)),
                           const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _postController,
-                              decoration: const InputDecoration(
-                                hintText: 'بماذا تفكر الآن؟',
-                                border: InputBorder.none,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.send, color: Color(0xFF1877F2)),
-                            onPressed: _submitPost,
-                          )
+                          Expanded(child: TextField(controller: _postController, decoration: const InputDecoration(hintText: 'بماذا تفكر الآن؟', border: InputBorder.none))),
+                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF1877F2)), onPressed: _submitPost)
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
                     Expanded(
                       child: _posts.isEmpty
-                          ? const Center(child: Text('لا توجد منشورات حالياً في الشبكة.'))
+                          ? const Center(child: Text('لا توجد منشورات حالياً.'))
                           : ListView.builder(
                               itemCount: _posts.length,
                               itemBuilder: (context, index) {
@@ -252,37 +250,9 @@ jobs:
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Row(
-                                          children: [
-                                            const CircleAvatar(radius: 18, child: Icon(Icons.account_circle)),
-                                            const SizedBox(width: 8),
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(post['username'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                Text(post['timestamp'], style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                                              ],
-                                            )
-                                          ],
-                                        ),
+                                        Text(post['username'], style: const TextStyle(fontWeight: FontWeight.bold)),
                                         const SizedBox(height: 10),
-                                        Text(post['text'] ?? '', style: const TextStyle(fontSize: 15)),
-                                        const Divider(),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                          children: [
-                                            TextButton.icon(
-                                              onPressed: () {},
-                                              icon: const Icon(Icons.thumb_up_outlined, size: 20),
-                                              label: Text('إعجاب (${post['likes']})'),
-                                            ),
-                                            TextButton.icon(
-                                              onPressed: () {},
-                                              icon: const Icon(Icons.mode_comment_outlined, size: 20),
-                                              label: const Text('تعليق'),
-                                            ),
-                                          ],
-                                        )
+                                        Text(post['text'] ?? ''),
                                       ],
                                     ),
                                   ),
@@ -295,9 +265,105 @@ jobs:
               );
             }
           }
+
+          // --- شاشة الريلز الذكية (TikTok Style) ---
+          class ReelsScreen extends StatelessWidget {
+            const ReelsScreen({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              // روابط الفيديوهات ستشير تلقائياً إلى المجلد المحلي على السيرفر عبر الواي فاي
+              final List<String> localReelsUrls = [
+                "http://$currentServerIp:4000/videos/reel1.mp4",
+                "http://$currentServerIp:4000/videos/reel2.mp4",
+                "http://$currentServerIp:4000/videos/reel3.mp4",
+              ];
+
+              return Scaffold(
+                backgroundColor: Colors.black,
+                body: PageView.builder(
+                  scrollDirection: Axis.vertical, // التمرير عمودياً مثل ريلز الحقيقي
+                  itemCount: localReelsUrls.length,
+                  itemBuilder: (context, index) {
+                    return ReelVideoPlayer(videoUrl: localReelsUrls[index], reelIndex: index + 1);
+                  },
+                ),
+              );
+            }
+          }
+
+          // متحكم تشغيل الفيديو الفردي داخل الريلز
+          class ReelVideoPlayer extends StatefulWidget {
+            final String videoUrl;
+            final int reelIndex;
+            const ReelVideoPlayer({super.key, required this.videoUrl, required this.reelIndex});
+
+            @override
+            State<ReelVideoPlayer> createState() => _ReelVideoPlayerState();
+          }
+
+          class _ReelVideoPlayerState extends State<ReelVideoPlayer> {
+            late VideoPlayerController _controller;
+            bool _isInitialized = false;
+
+            @override
+            void initState() {
+              super.initState();
+              // تشغيل البث المباشر للفيديو من السيرفر المحلي للواي فاي
+              _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+                ..initialize().then((_) {
+                  setState(() {
+                    _isInitialized = true;
+                    _controller.setLooping(true); // إعادة تشغيل الفيديو تلقائياً
+                    _controller.play(); // تشغيل فوري عند التمرير إليه
+                  });
+                });
+            }
+
+            @override
+            void dispose() {
+              _controller.dispose(); // إغلاق الفيديو فور مغادرته لتوفير ذاكرة الهاتف
+              super.dispose();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  _isInitialized
+                      ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: VideoPlayer(_controller))
+                      : const Center(child: CircularProgressIndicator(color: Colors.white)),
+                  // واجهة الأزرار الجانبية فوق الفيديو (إعجاب، تعليق، مشاركة)
+                  Positioned(
+                    right: 15,
+                    bottom: 100,
+                    child: Column(
+                      children: [
+                        IconButton(icon: const Icon(Icons.favorite, color: Colors.white, size: 35), onPressed: () {}),
+                        const Text('1.2k', style: TextStyle(color: Colors.white)),
+                        const SizedBox(height: 15),
+                        IconButton(icon: const Icon(Icons.comment, color: Colors.white, size: 35), onPressed: () {}),
+                        const Text('84', style: TextStyle(color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                  // اسم ناشر الريلز في الأسفل
+                  Positioned(
+                    left: 15,
+                    bottom: 30,
+                    child: Text(
+                      'فيديو محلي #${widget.reelIndex}\nبث مباشر عبر الواي فاي بسرعة 0MB',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ],
+              );
+            }
+          }
           EOF
 
-      - name: 🛠️ Force Overwrite build.gradle.kts with AGP 9.0+ Specifications
+      - name: 🛠 * Force Overwrite build.gradle.kts with AGP 9.0+ Specifications
         run: |
           cat << 'EOF' > android/app/build.gradle.kts
           plugins {
@@ -358,4 +424,5 @@ jobs:
           name: RabahDj-Flutter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
           
