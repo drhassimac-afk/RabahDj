@@ -392,7 +392,7 @@ jobs:
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.between,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('🌤️ مساعد الطقس والإنتاجية الذكي', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                                 Container(
@@ -418,7 +418,7 @@ jobs:
                         mainAxisSpacing: 10,
                         childAspectRatio: 1.5,
                         children: [
-                          _buildStatCard('إجمالي المنشورات', '$globalPostsCount', Icons.paper_plane, Colors.green),
+                          _buildStatCard('إجمالي المنشورات', '$globalPostsCount', Icons.send, Colors.green),
                           _buildStatCard('المستخدمين', '1 متصل', Icons.people, Colors.blue),
                           _buildStatCard('حالة النظام', 'Active', Icons.dns, Colors.amber),
                           _buildStatCard('سرعة البث', 'WiFi Direct', Icons.speed, Colors.purple),
@@ -440,7 +440,7 @@ jobs:
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                           Icon(icon, color: color, size: 20),
