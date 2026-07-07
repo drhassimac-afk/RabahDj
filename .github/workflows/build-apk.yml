@@ -33,13 +33,13 @@ jobs:
           # إنشاء المشروع مباشرة مع دعم خيار التحديث الرسمي
           flutter create . --org com.example --project-name rabahdj_local_app --platforms=android --overwrite
 
-      - name: 📝 Inject Target pubspec.yaml Dependencies
+           - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
           cat << 'EOF' > pubspec.yaml
           name: rabahdj_local_app
-          description: "A new Flutter project."
+          description: "A new Advanced Local Social Network."
           publish_to: 'none'
-          version: 1.0.0+1
+          version: 1.1.0+2
 
           environment:
             sdk: '>=3.0.0 <4.0.0'
@@ -54,6 +54,9 @@ jobs:
             http: ^1.2.0
             image_picker: ^1.1.2
             file_picker: ^8.1.4
+            sqflite: ^2.3.0        # لإدارة قاعدة البيانات المحلية على الهاتف
+            path: ^1.8.3           # للتعامل مع مسارات ملفات قاعدة البيانات
+            nsd: ^1.2.2            # للاكتشاف التلقائي للسيرفر عبر شبكة الـ WiFi
 
           dev_dependencies:
             flutter_test:
@@ -64,27 +67,26 @@ jobs:
             uses-material-design: true
           EOF
 
+
       - name: 📲 Inject Ultra App UI with Profile & WiFi Local Share
         run: |
-          cat << 'EOF' > lib/main.dart
+                   cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
           import 'package:flutter_local_notifications/flutter_local_notifications.dart';
           import 'package:socket_io_client/socket_io_client.dart' as IO;
           import 'package:uuid/uuid.dart';
           import 'package:http/http.dart' as http;
           import 'package:image_picker/image_picker.dart';
-          import 'package:file_picker/file_picker.dart';
           import 'dart:convert';
           import 'dart:io';
 
           final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
           IO.Socket? socket;
           String currentServerIp = "192.168.1.10";
-          List<Map<String, dynamic>> globalChatMessages = [];
+          List<Map<String, dynamic>> localFeedPosts = []; // قائمة المنشورات الحية
           List<String> connectedUsers = [];
           String myUsername = "مستخدم محلي";
           String? myProfileB64;
-          String? myCoverB64;
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
@@ -100,7 +102,11 @@ jobs:
             Widget build(BuildContext context) {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
-                theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2), brightness: Brightness.dark), useMaterial3: true),
+                theme: ThemeData(
+                  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2), brightness: Brightness.dark),
+                  useMaterial3: true,
+                  scaffoldBackgroundColor: const Color(0xFF18191A), // لون خلفية فيسبوك المظلم
+                ),
                 home: const MainNavigationScreen(),
               );
             }
@@ -119,10 +125,7 @@ jobs:
             final TextEditingController _nameController = TextEditingController(text: myUsername);
 
             void connectToServer() {
-              if (socket != null) {
-                socket!.disconnect();
-                socket!.dispose();
-              }
+              if (socket != null) { socket!.disconnect(); socket!.dispose(); }
 
               setState(() {
                 currentServerIp = _ipController.text.trim();
@@ -139,43 +142,41 @@ jobs:
               socket!.onConnect((_) {
                 setState(() => _isConnected = true);
                 socket!.emit('join', {'username': myUsername, 'profile': myProfileB64});
-                _showNotification("تم الاتصال", "أنت متصل الآن بشبكة RabahDj المحلية");
               });
 
-              socket!.onDisconnect((_) {
-                setState(() => _isConnected = false);
-              });
+              socket!.onDisconnect((_) => setState(() => _isConnected = false));
 
-              socket!.on('message', (data) {
+              // استقبال المنشورات الجديدة من الشبكة فوراً
+              socket!.on('new_post', (data) {
                 if (mounted) {
                   setState(() {
-                    globalChatMessages.add(Map<String, dynamic>.from(data));
+                    localFeedPosts.insert(0, Map<String, dynamic>.from(data));
+                  });
+                }
+              });
+
+              // تحديث الإعجابات في الوقت الفعلي عند الجميع
+              socket!.on('post_liked', (data) {
+                if (mounted) {
+                  setState(() {
+                    final index = localFeedPosts.indexWhere((p) => p['id'] == data['postId']);
+                    if (index != -1) {
+                      localFeedPosts[index]['likes'] = data['likesCount'];
+                    }
                   });
                 }
               });
 
               socket!.on('users_list', (data) {
-                if (mounted) {
-                  setState(() {
-                    connectedUsers = List<String>.from(data);
-                  });
-                }
+                if (mounted) setState(() => connectedUsers = List<String>.from(data));
               });
-            }
-
-            Future<void> _showNotification(String title, String body) async {
-              const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-                'local_ch_id', 'Local Alerts', channelDescription: 'WiFi Alerts',
-                importance: Importance.max, priority: Priority.high);
-              await _localNotificationsPlugin.show(0, title, body, const NotificationDetails(android: androidDetails));
             }
 
             @override
             Widget build(BuildContext context) {
               final List<Widget> screens = [
                 HomeScreen(isConnected: _isConnected, ipController: _ipController, nameController: _nameController, onConnect: connectToServer),
-                const ChatScreen(),
-                const LocalShareScreen(),
+                const FeedScreen(), // خلاصة المنشورات المتطورة
                 const ProfileScreen()
               ];
 
@@ -186,18 +187,19 @@ jobs:
                   onTap: (index) => setState(() => _currentIndex = index),
                   selectedItemColor: const Color(0xFF1877F2),
                   unselectedItemColor: Colors.grey,
+                  backgroundColor: const Color(0xFF242526),
                   type: BottomNavigationBarType.fixed,
                   items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
-                    BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'الدردشة'),
-                    BottomNavigationBarItem(icon: Icon(Icons.folder_shared), label: 'مشاركة'),
-                    BottomNavigationBarItem(icon: Icon(Icons.person), label: 'حسابي')
+                    BottomNavigationBarItem(icon: Icon(Icons.wifi_protected_setup), label: 'الشبكة'),
+                    BottomNavigationBarItem(icon: Icon(Icons.dynamic_feed), label: 'الخلاصة'),
+                    BottomNavigationBarItem(icon: Icon(Icons.account_circle), label: 'حسابي'),
                   ],
                 ),
               );
             }
           }
 
+          // شاشة الشبكة والاتصال
           class HomeScreen extends StatelessWidget {
             final bool isConnected;
             final TextEditingController ipController;
@@ -209,32 +211,83 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('RabahDj Local Network'), centerTitle: true),
+                appBar: AppBar(title: const Text('بوابة اتصال RabahDj'), backgroundColor: const Color(0xFF242526)),
                 body: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
-                      Card(
-                        color: isConnected ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
-                        child: ListTile(
-                          leading: Icon(isConnected ? Icons.wifi : Icons.wifi_off, color: isConnected ? Colors.green : Colors.red),
-                          title: Text(isConnected ? 'متصل بالسيرفر المحلي' : 'غير متصل بالشبكة'),
-                          subtitle: Text('المتصلين الآن: ${connectedUsers.length} مستخدم'),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isConnected ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isConnected ? Colors.green : Colors.red)
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(isConnected ? Icons.gpp_good : Icons.gpp_bad, color: isConnected ? Colors.green : Colors.red, size: 30),
+                            const SizedBox(width: 12),
+                            Text(isConnected ? 'أنت متصل بالبث المحلي الحقيقي' : 'أنت غير متصل بالسيرفر المحلى', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ],
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم الشهرة بالشبكة', border: OutlineInputBorder())),
                       const SizedBox(height: 12),
-                      TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم المستخدم للشبكة', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      TextField(controller: ipController, decoration: const InputDecoration(labelText: 'عنوان IP السيرفر المحلي', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
+                      TextField(controller: ipController, decoration: const InputDecoration(labelText: 'عنوان IP اللابتوب المستضيف', border: OutlineInputBorder())),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
                         style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: const Color(0xFF1877F2)),
                         onPressed: onConnect,
-                        icon: const Icon(Icons.sync, color: Colors.white),
-                        label: Text(isConnected ? 'إعادة الاتصال بالـ WiFi' : 'اتصال بالشبكة المحلية', style: const TextStyle(color: Colors.white)),
+                        child: const Text('تحديث والاتصال بالـ WiFi', style: TextStyle(color: Colors.white, fontSize: 16)),
                       ),
-                      const SizedBox(height: 16),
-                      const Divider(),
-                      Expanded(
-                        child: connectedUsers.isEmpty
-                            ? const Center(child: Text('لا يوجد مستخدمين آخرين متصلين حالياً'))
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+
+          // شاشة خلاصة المنشورات (على طراز فيسبوك الاحترافي)
+          class FeedScreen extends StatefulWidget {
+            const FeedScreen({super.key});
+            @override
+            State<FeedScreen> createState() => _FeedScreenState();
+          }
+
+          class _FeedScreenState extends State<FeedScreen> {
+            final TextEditingController _postController = TextEditingController();
+            String? _selectedPostImageB64;
+
+            Future<void> _pickPostImage() async {
+              final ImagePicker picker = ImagePicker();
+              final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 40);
+              if (image != null) {
+                final bytes = await File(image.path).readAsBytes();
+                setState(() => _selectedPostImageB64 = base64Encode(bytes));
+              }
+            }
+
+            void _publishPost() {
+              if (_postController.text.trim().isEmpty && _selectedPostImageB64 == null) return;
+              if (socket == null || !socket!.connected) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء الاتصال بالشبكة أولاً!')));
+                return;
+              }
+
+              socket!.emit('create_post', {
+                'id': const Uuid().v4(),
+                'author': myUsername,
+                'avatar': myProfileB64,
+                'content': _postController.text.trim(),
+                'image': _selectedPostImageB64,
+                'likes': 0,
+                'time': 'الآن'
+              });
+
+              _postController.clear();
+              setState(() => _selectedPostImageB64 = null);
+            }
+
+            @override
+
