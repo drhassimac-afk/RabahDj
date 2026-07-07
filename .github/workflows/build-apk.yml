@@ -36,7 +36,7 @@ jobs:
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
-          sed -i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2\n  http: ^1.2.0\n  image_picker: ^1.1.2\n  file_picker: ^8.1.4' pubspec.yaml
+          sed - i '/dependencies:/a \  flutter_local_notifications: ^22.0.1\n  socket_io_client: ^3.1.1\n  uuid: ^4.3.3\n  video_player: ^2.9.2\n  http: ^1.2.0\n  image_picker: ^1.1.2\n  file_picker: ^8.1.4' pubspec.yaml
 
       - name: 📲 Inject Ultra App UI with Profile & WiFi Local Share
         run: |
@@ -61,11 +61,11 @@ jobs:
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
+            const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             
-            // تم تفريغ الدالة تماماً لقطع أي شك في التفسير وضمان عبور الـ Compiler بنجاح
-            await _localNotificationsPlugin.initialize(
-              const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'))
-            );
+            // هنا تم تصحيح صياغة البارامتر المسمى الصارم لحزمة v22 المحدثة
+            await _localNotificationsPlugin.initialize(initializationSettings: initializationSettings);
             
             runApp(const MyApp());
           }
