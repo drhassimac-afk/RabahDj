@@ -88,11 +88,12 @@ jobs:
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
+            
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             
-            // التمرير الصحيح والمتوافق لحزم v22+
-            await _localNotificationsPlugin.initialize(initializationSettings: initializationSettings);
+            // تمرير كلاس الإعدادات مباشرة كـ Positional Argument متوافق مع بنية السيرفر المحملة
+            await _localNotificationsPlugin.initialize(initializationSettings);
             
             runApp(const MyApp());
           }
