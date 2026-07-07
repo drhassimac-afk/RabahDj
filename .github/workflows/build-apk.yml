@@ -63,8 +63,10 @@ jobs:
             WidgetsFlutterBinding.ensureInitialized();
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-            // تم إصلاح الاستدعاء هنا باستخدام المعامل المسمى لتوافق الإصدار 22
-            await _localNotificationsPlugin.initialize(initializationSettings: initializationSettings);
+            
+            // تم تمرير الإعدادات بأبسط طريقة متوافقة مع الإصدار الجديد لتجنب مشاكل الاسماء المسماة
+            await _localNotificationsPlugin.initialize(initializationSettings);
+            
             runApp(const MyApp());
           }
 
