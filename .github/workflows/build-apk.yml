@@ -181,7 +181,24 @@ jobs:
                       const SizedBox(height: 12),
                       TextField(controller: ipController, decoration: const InputDecoration(labelText: 'عنوان IP السيرفر المستضيف', border: OutlineInputBorder())),
                       const SizedBox(height: 16),
-                      ElevatedButton(style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: const Color(0xFF1877F2)), onPressed: onConnect, child: const Text('الاتصال والمزامنة الآن', style: TextStyle(color: Colors.white))),
+                      ElevatedButton.icon(onPressed: onConnect, icon: const Icon(Icons.sync), label: const Text('تحديث الاتصال'), style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50))),
+                      const SizedBox(height: 20),
+                      const Align(alignment: Alignment.centerLeft, child: Text('المستخدمون النشطون حالياً:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: activeUsersList.isEmpty
+                            ? const Center(child: Text('لا يوجد مستخدمين آخرين متصلين حالياً'))
+                            : ListView.builder(
+                                itemCount: activeUsersList.length,
+                                itemBuilder: (context, index) {
+                                  final user = activeUsersList[index];
+                                  return ListTile(
+                                    leading: CircleAvatar(backgroundImage: user['profile'] != null ? MemoryImage(base64Decode(user['profile'])) : null, child: user['profile'] == null ? const Icon(Icons.person) : null),
+                                    title: Text(user['username'] ?? 'مستخدم مجهول'),
+                                    subtitle: const Text('جاهز لاستلام الملفات'),
+                                  );
+                                },
+                              ),
+                      )
                     ],
                   ),
                 ),
@@ -189,29 +206,5 @@ jobs:
             }
           }
 
-          class FileSharingHubScreen extends StatefulWidget {
+          class FileSharingHubScreen extends StatelessWidget {
             const FileSharingHubScreen({super.key});
-            @override
-            State<FileSharingHubScreen> createState() => _FileSharingHubScreenState();
-          }
-
-          class _FileSharingHubScreenState extends State<FileSharingHubScreen> {
-            List<dynamic> _sharedFiles = []; bool _loading = false;
-
-            @override
-            void initState() { super.initState(); _refreshFiles(); }
-
-            Future<void> _refreshFiles() async {
-              setState(() => _loading = true);
-              try {
-                final res = await http.get(Uri.parse('http://$currentServerIp:4000/files-list'));
-                if (res.statusCode == 200) setState(() => _sharedFiles = jsonDecode(res.body));
-              } catch (e) { debugPrint("خطأ استرجاع الملفات: $e"); }
-              setState(() => _loading = false);
-            }
-
-            Future<void> _pickAndUploadFile() async {
-              FilePickerResult? pickResult = await FilePicker.platform.pickFiles();
-              if (pickResult != null && pickResult.files.single.path != null) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جارٍ رفع الملف عبر الواي فاي محلياً...')));
-                try {
