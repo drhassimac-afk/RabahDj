@@ -6,6 +6,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Bonsoir = require('bonsoir');
+const { open } = require('sqlite');
+const sqlite3 = require('sqlite3');
 
 const app = express();
 app.use(cors());
@@ -33,12 +35,33 @@ const io = new Server(server, {
     }
 });
 
-// الذاكرة المؤقتة (تختفي عند إعادة تشغيل السيرفر)
+// الذاكرة المؤقتة للمستخدمين المتصلين حالياً بالواي فاي
 let activeUsers = new Map(); 
-let localPostsFeed = []; // مصفوفة حفظ المنشورات والقصص المحلية الحية
+let db;
+
+// تهيئة قاعدة بيانات SQLite وإنشاء الجداول إذا لم تكن موجودة
+async function initDatabase() {
+    db = await open({
+        filename: path.join(__dirname, 'database.db'),
+        driver: sqlite3.Database
+    });
+
+    await db.exec(`
+        CREATE TABLE IF NOT EXISTS posts (
+            id TEXT PRIMARY KEY,
+            author TEXT,
+            avatar TEXT,
+            content TEXT,
+            image TEXT,
+            likes INTEGER DEFAULT 0,
+            time TEXT
+        )
+    `);
+    console.log('💾 قاعدة بيانات SQLite جاهزة وتم التحقق من الجداول بنجاح!');
+}
 
 // 1. رابط HTTP لرفع الملفات من التطبيق
-app.post('/upload', upload.single('file'), (req, res) => {
+app.post('/upload', upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'لم يتم اختيار أي ملف' });
     }
@@ -56,31 +79,48 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 // 2. إدارة اتصالات Socket.io في الوقت الفعلي
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
     console.log(`جهاز جديد اتصل بالشبكة: ${socket.id}`);
 
     // انضمام مستخدم باسم وصورة محددة
-    socket.on('join', (data) => {
+    socket.on('join', async (data) => {
         activeUsers.set(socket.id, data.username);
         updateUsersList();
         
-        // إرسال المنشورات السابقة للمستخدم الجديد فور دخوله لكي لا تظهر الصفحة بيضاء
-        socket.emit('initial_feed', localPostsFeed);
+        // جلب جميع المنشورات المخزنة دائماً في قاعدة البيانات وإرسالها للمستخدم فور دخوله
+        try {
+            const savedPosts = await db.all('SELECT * FROM posts ORDER BY ROWID DESC');
+            socket.emit('initial_feed', savedPosts);
+        } catch (err) {
+            console.error('خطأ أثناء جلب المنشورات من قاعدة البيانات:', err);
+        }
+        
         console.log(`👤 ${data.username} انضم إلى الشبكة المحلية`);
     });
 
-    // [جديد] استقبال منشور فيسبوك محلي وتوزيعه فوراً
-    socket.on('create_post', (postData) => {
-        localPostsFeed.unshift(postData); // حفظ في بداية المصفوفة
-        io.emit('new_post', postData);    // بث فوري لجميع الهواتف المتصلة بالواي فاي
+    // استقبال منشور فيسبوك محلي وحفظه في SQLite ثم توزيعه فوراً
+    socket.on('create_post', async (postData) => {
+        try {
+            await db.run(
+                'INSERT INTO posts (id, author, avatar, content, image, likes, time) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [postData.id, postData.author, postData.avatar, postData.content, postData.image, postData.likes || 0, postData.time]
+            );
+            io.emit('new_post', postData); // بث فوري لجميع الهواتف المتصلة بالواي فاي
+        } catch (err) {
+            console.error('فشل حفظ المنشور في قاعدة البيانات:', err);
+        }
     });
 
-    // [جديد] استقبال طلب إعجاب بمنشور وتحديث العداد عند الجميع فوراً
-    socket.on('like_post', (data) => {
-        const post = localPostsFeed.find(p => p.id === data.postId);
-        if (post) {
-            post.likes = (post.likes || 0) + 1;
-            io.emit('post_liked', { postId: post.id, likesCount: post.likes });
+    // استقبال طلب إعجاب بمنشور وتحديث العداد في SQLite ثم عند الجميع فوراً
+    socket.on('like_post', async (data) => {
+        try {
+            await db.run('UPDATE posts SET likes = likes + 1 WHERE id = ?', [data.postId]);
+            const updatedPost = await db.get('SELECT likes FROM posts WHERE id = ?', [data.postId]);
+            if (updatedPost) {
+                io.emit('post_liked', { postId: data.postId, likesCount: updatedPost.likes });
+            }
+        } catch (err) {
+            console.error('فشل تحديث الإعجابات في قاعدة البيانات:', err);
         }
     });
 
@@ -110,7 +150,6 @@ async function startServerBroadcast() {
     try {
         const bonsoir = await Bonsoir.init();
         
-        // تصحيح التسمية لتبدأ بـ _ والبروتوكول المستهدف
         const service = bonsoir.createService({
             name: 'RabahDj Local Server',
             type: 'rabahdj', 
@@ -127,14 +166,13 @@ async function startServerBroadcast() {
 
 // تشغيل السيرفر بالكامل
 const PORT = 4000;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
     console.log(`=============================================`);
-    console.log(`🚀 سيرفر RabahDj المحلي المتطور يعمل بنجاح!`);
+    console.log(`🚀 سيرفر RabahDj المحلي المستقر يعمل بنجاح!`);
     console.log(`📢 متصل بالبورت الاستراتيجي: ${PORT}`);
     console.log(`=============================================`);
     
-    // إطلاق البث التلقائي بعد إقلاع السيرفر
+    // تشغيل قاعدة البيانات أولاً ثم البث الآلي
+    await initDatabase();
     startServerBroadcast();
 });
-
-
