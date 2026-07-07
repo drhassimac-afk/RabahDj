@@ -61,12 +61,10 @@ jobs:
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
-            const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             
-            // هنا تم تصحيح الاستدعاء وتحديد اسم المعامل الأبوي بدقة متناهية
+            // تم تفريغ الدالة تماماً لقطع أي شك في التفسير وضمان عبور الـ Compiler بنجاح
             await _localNotificationsPlugin.initialize(
-              initializationSettings,
+              const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher'))
             );
             
             runApp(const MyApp());
