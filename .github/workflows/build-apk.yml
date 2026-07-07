@@ -37,7 +37,7 @@ jobs:
           name: rabahdj_local_app
           description: "A new Advanced Local Social Network."
           publish_to: 'none'
-          version: 1.2.0+3
+          version: 1.3.0+4
 
           environment:
             sdk: '>=3.0.0 <4.0.0'
@@ -65,7 +65,7 @@ jobs:
             uses-material-design: true
           EOF
 
-      - name: 📲 Inject Ultra App UI with Profile & Advanced Private Chat
+      - name: 📲 Inject Ultra App UI with Profile & WiFi File Sharing Hub
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -74,6 +74,7 @@ jobs:
           import 'package:uuid/uuid.dart';
           import 'package:http/http.dart' as http;
           import 'package:image_picker/image_picker.dart';
+          import 'package:file_picker/file_picker.dart';
           import 'package:nsd/nsd.dart' as nsd;
           import 'dart:convert';
           import 'dart:io';
@@ -145,12 +146,8 @@ jobs:
                 
                 await Future.delayed(const Duration(seconds: 8));
                 nsd.stopDiscovery(discovery);
-                if (mounted && _isSearching) {
-                  setState(() { _isSearching = false; });
-                }
-              } catch (e) {
-                setState(() { _isSearching = false; });
-              }
+                if (mounted && _isSearching) { setState(() { _isSearching = false; }); }
+              } catch (e) { setState(() { _isSearching = false; }); }
             }
 
             void connectToServer() {
@@ -202,11 +199,7 @@ jobs:
                     String senderId = data['senderId'];
                     String senderName = data['senderName'];
                     if (!privateMessages.containsKey(senderId)) { privateMessages[senderId] = []; }
-                    privateMessages[senderId]!.add({
-                      'sender': senderName,
-                      'text': data['text'],
-                      'isMe': false
-                    });
+                    privateMessages[senderId]!.add({'sender': senderName, 'text': data['text'], 'isMe': false});
                   });
                   _showNotification("رسالة خاصة جديدة", "وصلتك رسالة من ${data['senderName']}");
                 }
@@ -226,7 +219,7 @@ jobs:
                 HomeScreen(isConnected: _isConnected, isSearching: _isSearching, ipController: _ipController, nameController: _nameController, onConnect: connectToServer, onAutoDiscover: startAutoDiscovery),
                 const FeedScreen(), 
                 const PrivateChatsListScreen(), 
-                const ProfileScreen()
+                const FileSharingHubScreen() // [جديد] شاشة مركز مشاركة وتنزيل الملفات
               ];
 
               return Scaffold(
@@ -242,7 +235,7 @@ jobs:
                     BottomNavigationBarItem(icon: Icon(Icons.wifi_protected_setup), label: 'الشبكة'),
                     BottomNavigationBarItem(icon: Icon(Icons.dynamic_feed), label: 'الخلاصة'),
                     BottomNavigationBarItem(icon: Icon(Icons.mail_outline), label: 'الرسائل'),
-                    BottomNavigationBarItem(icon: Icon(Icons.account_circle), label: 'حسابي'),
+                    BottomNavigationBarItem(icon: Icon(Icons.folder_shared), label: 'الملفات'),
                   ],
                 ),
               );
