@@ -65,7 +65,7 @@ jobs:
             uses-material-design: true
           EOF
 
-      - name: 📲 Inject Ultra App UI with Profile & WiFi File Sharing Hub
+      - name: 📲 Inject Part 1 - Main and Layout Structure
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -159,6 +159,11 @@ jobs:
               );
             }
           }
+          EOF
+
+      - name: 📲 Inject Part 2 - App Screens UI
+        run: |
+          cat << 'EOF' >> lib/main.dart
 
           class HomeScreen extends StatelessWidget {
             final bool isConnected; final TextEditingController ipController; final TextEditingController nameController; final VoidCallback onConnect;
@@ -206,6 +211,3 @@ jobs:
             }
           }
 
-          class FileSharingHubScreen extends StatelessWidget {
-            const FileSharingHubScreen({super.key});
-            Future<void> pickAndUploadFile() async {
