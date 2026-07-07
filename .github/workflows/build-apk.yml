@@ -63,7 +63,8 @@ jobs:
             WidgetsFlutterBinding.ensureInitialized();
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-            await _localNotificationsPlugin.initialize(initializationSettings);
+            // تم إصلاح الاستدعاء هنا باستخدام المعامل المسمى لتوافق الإصدار 22
+            await _localNotificationsPlugin.initialize(initializationSettings: initializationSettings);
             runApp(const MyApp());
           }
 
@@ -151,7 +152,7 @@ jobs:
           android {
             namespace = "com.example.rabahdj_local_app"
             compileSdk = 36
-            defaultConfig { applicationId = "com.example.rabahdj_local_app"; minSdk = 23; targetSdk = 34; versionCode = 1; versionName = "1.0.0" }
+            defaultConfig { applicationId = "com.example.rabahdj_local_app"; minSdk = 24; targetSdk = 34; versionCode = 1; versionName = "1.0.0" }
           }
           EOF
 
