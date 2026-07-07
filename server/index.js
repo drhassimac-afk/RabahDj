@@ -5,6 +5,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const Bonsoir = require('bonsoir');
 
 const app = express();
 app.use(cors());
@@ -32,8 +33,9 @@ const io = new Server(server, {
     }
 });
 
-// الذاكرة المؤقتة لحفظ المستخدمين والرسائل (تختفي عند إعادة تشغيل السيرفر)
+// الذاكرة المؤقتة (تختفي عند إعادة تشغيل السيرفر)
 let activeUsers = new Map(); 
+let localPostsFeed = []; // مصفوفة حفظ المنشورات والقصص المحلية الحية
 
 // 1. رابط HTTP لرفع الملفات من التطبيق
 app.post('/upload', upload.single('file'), (req, res) => {
@@ -57,14 +59,32 @@ app.post('/upload', upload.single('file'), (req, res) => {
 io.on('connection', (socket) => {
     console.log(`جهاز جديد اتصل بالشبكة: ${socket.id}`);
 
-    // انضمام مستخدم باسم محدد
+    // انضمام مستخدم باسم وصورة محددة
     socket.on('join', (data) => {
         activeUsers.set(socket.id, data.username);
         updateUsersList();
+        
+        // إرسال المنشورات السابقة للمستخدم الجديد فور دخوله لكي لا تظهر الصفحة بيضاء
+        socket.emit('initial_feed', localPostsFeed);
         console.log(`👤 ${data.username} انضم إلى الشبكة المحلية`);
     });
 
-    // استقبال رسالة دردشة وإعادة توجيهها للجميع فوراً
+    // [جديد] استقبال منشور فيسبوك محلي وتوزيعه فوراً
+    socket.on('create_post', (postData) => {
+        localPostsFeed.unshift(postData); // حفظ في بداية المصفوفة
+        io.emit('new_post', postData);    // بث فوري لجميع الهواتف المتصلة بالواي فاي
+    });
+
+    // [جديد] استقبال طلب إعجاب بمنشور وتحديث العداد عند الجميع فوراً
+    socket.on('like_post', (data) => {
+        const post = localPostsFeed.find(p => p.id === data.postId);
+        if (post) {
+            post.likes = (post.likes || 0) + 1;
+            io.emit('post_liked', { postId: post.id, likesCount: post.likes });
+        }
+    });
+
+    // استقبال رسالة دردشة عادية
     socket.on('send_message', (msgData) => {
         io.emit('message', msgData);
     });
@@ -80,17 +100,41 @@ io.on('connection', (socket) => {
     });
 });
 
-// دالة لتحديث قائمة المتصلين عند الجميع
 function updateUsersList() {
     const usersArray = Array.from(activeUsers.values());
     io.emit('users_list', usersArray);
 }
 
-// تشغيل السيرفر على البورت 4000
+// دالة البث التلقائي المصححة mDNS ليتعرف عليها الهاتف الذكي دون IP
+async function startServerBroadcast() {
+    try {
+        const bonsoir = await Bonsoir.init();
+        
+        // تصحيح التسمية لتبدأ بـ _ والبروتوكول المستهدف
+        const service = bonsoir.createService({
+            name: 'RabahDj Local Server',
+            type: 'rabahdj', 
+            protocol: 'tcp',
+            port: 4000
+        });
+
+        await bonsoir.broadcast(service);
+        console.log('📡 تم تفعيل البث الآلي (mDNS) بنجاح، رادار الهواتف يمكنه التقاط السيرفر الآن!');
+    } catch (error) {
+        console.error('خطأ أثناء تشغيل نظام البث mDNS:', error);
+    }
+}
+
+// تشغيل السيرفر بالكامل
 const PORT = 4000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`=============================================`);
-    console.log(`🚀 سيرفر RabahDj المحلي يعمل بنجاح!`);
-    console.log(`📢 متصل بالبورت: ${PORT}`);
+    console.log(`🚀 سيرفر RabahDj المحلي المتطور يعمل بنجاح!`);
+    console.log(`📢 متصل بالبورت الاستراتيجي: ${PORT}`);
     console.log(`=============================================`);
+    
+    // إطلاق البث التلقائي بعد إقلاع السيرفر
+    startServerBroadcast();
 });
+
+
