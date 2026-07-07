@@ -54,7 +54,7 @@ jobs:
             file_picker: ^8.1.4
             sqflite: ^2.3.0
             path: ^1.8.3
-            nsd: ^1.2.2
+            nsd: ^5.0.1
 
           dev_dependencies:
             flutter_test:
@@ -91,7 +91,6 @@ jobs:
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             
-            // تصحيح التمرير ليتوافق مع النسخة v22+ ويمنع فشل البناء
             await _localNotificationsPlugin.initialize(
               initializationSettings: initializationSettings,
             );
