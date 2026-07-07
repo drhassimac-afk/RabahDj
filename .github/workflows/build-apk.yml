@@ -74,6 +74,7 @@ jobs:
           import 'package:uuid/uuid.dart';
           import 'package:http/http.dart' as http;
           import 'package:image_picker/image_picker.dart';
+          import 'package:nsd/nsd.dart' as nsd;
           import 'dart:convert';
           import 'dart:io';
 
@@ -118,8 +119,42 @@ jobs:
           class _MainNavigationScreenState extends State<MainNavigationScreen> {
             int _currentIndex = 0;
             bool _isConnected = false;
+            bool _isSearching = false;
             final TextEditingController _ipController = TextEditingController(text: currentServerIp);
             final TextEditingController _nameController = TextEditingController(text: myUsername);
+
+            // دالة البحث التلقائي عن السيرفر في الشبكة المحلية عبر بروتوكول mDNS
+            Future<void> startAutoDiscovery() async {
+              setState(() { _isSearching = true; });
+              try {
+                // البحث عن خدمة مسجلة بنوع _rabahdj._tcp (سنقوم بإعداد السيرفر ليبث هذا الاسم)
+                final discovery = await nsd.startDiscovery('_rabahdj._tcp');
+                discovery.addListener(() {
+                  if (discovery.services.isNotEmpty) {
+                    final service = discovery.services.first;
+                    if (service.addresses.isNotEmpty) {
+                      final foundIp = service.addresses.first.address;
+                      nsd.stopDiscovery(discovery);
+                      setState(() {
+                        _ipController.text = foundIp;
+                        _isSearching = false;
+                      });
+                      connectToServer(); // الاتصال التلقائي فور العثور عليه
+                    }
+                  }
+                });
+                
+                // التوقف التلقائي عن البحث بعد 10 ثوانٍ لتوفير بطارية الهاتف
+                await Future.delayed(const Duration(seconds: 10));
+                nsd.stopDiscovery(discovery);
+                if (mounted && _isSearching) {
+                  setState(() { _isSearching = false; });
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على سيرفر تلقائياً، جرب إدخال الـ IP يدوياً')));
+                }
+              } catch (e) {
+                setState(() { _isSearching = false; });
+              }
+            }
 
             void connectToServer() {
               if (socket != null) { socket!.disconnect(); socket!.dispose(); }
@@ -145,9 +180,7 @@ jobs:
 
               socket!.on('new_post', (data) {
                 if (mounted) {
-                  setState(() {
-                    localFeedPosts.insert(0, Map<String, dynamic>.from(data));
-                  });
+                  setState(() { localFeedPosts.insert(0, Map<String, dynamic>.from(data)); });
                 }
               });
 
@@ -155,9 +188,7 @@ jobs:
                 if (mounted) {
                   setState(() {
                     final index = localFeedPosts.indexWhere((p) => p['id'] == data['postId']);
-                    if (index != -1) {
-                      localFeedPosts[index]['likes'] = data['likesCount'];
-                    }
+                    if (index != -1) { localFeedPosts[index]['likes'] = data['likesCount']; }
                   });
                 }
               });
@@ -170,7 +201,14 @@ jobs:
             @override
             Widget build(BuildContext context) {
               final List<Widget> screens = [
-                HomeScreen(isConnected: _isConnected, ipController: _ipController, nameController: _nameController, onConnect: connectToServer),
+                HomeScreen(
+                  isConnected: _isConnected, 
+                  isSearching: _isSearching,
+                  ipController: _ipController, 
+                  nameController: _nameController, 
+                  onConnect: connectToServer,
+                  onAutoDiscover: startAutoDiscovery,
+                ),
                 const FeedScreen(), 
                 const ProfileScreen()
               ];
@@ -196,11 +234,21 @@ jobs:
 
           class HomeScreen extends StatelessWidget {
             final bool isConnected;
+            final bool isSearching;
             final TextEditingController ipController;
             final TextEditingController nameController;
             final VoidCallback onConnect;
+            final VoidCallback onAutoDiscover;
 
-            const HomeScreen({super.key, required this.isConnected, required this.ipController, required this.nameController, required this.onConnect});
+            const HomeScreen({
+              super.key, 
+              required this.isConnected, 
+              required this.isSearching,
+              required this.ipController, 
+              required this.nameController, 
+              required this.onConnect,
+              required this.onAutoDiscover,
+            });
 
             @override
             Widget build(BuildContext context) {
@@ -208,43 +256,5 @@ jobs:
                 appBar: AppBar(title: const Text('بوابة اتصال RabahDj'), backgroundColor: const Color(0xFF242526)),
                 body: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isConnected ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isConnected ? Colors.green : Colors.red)
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(isConnected ? Icons.gpp_good : Icons.gpp_bad, color: isConnected ? Colors.green : Colors.red, size: 30),
-                            const SizedBox(width: 12),
-                            Text(isConnected ? 'أنت متصل بالبث المحلي الحقيقي' : 'أنت غير متصل بالسيرفر المحلى', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم الشهرة بالشبكة', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      TextField(controller: ipController, decoration: const InputDecoration(labelText: 'عنوان IP اللابتوب المستضيف', border: OutlineInputBorder())),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: const Color(0xFF1877F2)),
-                        onPressed: onConnect,
-                        child: const Text('تحديث والاتصال بالـ WiFi', style: TextStyle(color: Colors.white, fontSize: 16)),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-          }
-
-          class FeedScreen extends StatefulWidget {
-            const FeedScreen({super.key});
-            @override
-            State<FeedScreen> createState() => _FeedScreenState();
-          }
-
+                  child: SingleChildScrollView(
+                    child: Column(
