@@ -31,13 +31,13 @@ jobs:
           find . -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} +
           flutter create . --org com.example --project-name rabahdj_local_app --platforms=android --overwrite
 
-      - name: 📝 Inject Target pubspec.yaml Dependencies
+         - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
           cat << 'EOF' > pubspec.yaml
           name: rabahdj_local_app
-          description: "A new Flutter project."
+          description: "A new Advanced Local Social Network."
           publish_to: 'none'
-          version: 1.0.0+1
+          version: 1.1.0+2
 
           environment:
             sdk: '>=3.0.0 <4.0.0'
@@ -52,6 +52,9 @@ jobs:
             http: ^1.2.0
             image_picker: ^1.1.2
             file_picker: ^8.1.4
+            sqflite: ^2.3.0        # لإدارة قاعدة البيانات المحلية على الهاتف
+            path: ^1.8.3           # للتعامل مع مسارات ملفات قاعدة البيانات
+            nsd: ^1.2.2            # للاكتشاف التلقائي للسيرفر عبر شبكة الـ WiFi
 
           dev_dependencies:
             flutter_test:
