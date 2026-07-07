@@ -111,7 +111,6 @@ jobs:
           }
 
           class _HomeScreenState extends State<HomeScreen> {
-            final List<Map<String, dynamic>> _posts = [];
             @override
             Widget build(BuildContext context) {
               return Scaffold(appBar: AppBar(title: const Text('RabahDj Local')), body: const Center(child: Text('الشبكة الرئيسية')));
@@ -151,8 +150,8 @@ jobs:
           plugins { id("com.android.application"); id("kotlin-android"); id("dev.flutter.flutter-gradle-plugin") }
           android {
             namespace = "com.example.rabahdj_local_app"
-            compileSdk = 34
-            defaultConfig { applicationId = "com.example.rabahdj_local_app"; minSdk = 21; targetSdk = 34; versionCode = 1; versionName = "1.0.0" }
+            compileSdk = 36
+            defaultConfig { applicationId = "com.example.rabahdj_local_app"; minSdk = 23; targetSdk = 34; versionCode = 1; versionName = "1.0.0" }
           }
           EOF
 
