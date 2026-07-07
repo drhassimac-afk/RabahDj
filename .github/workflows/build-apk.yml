@@ -35,9 +35,9 @@ jobs:
         run: |
           cat << 'EOF' > pubspec.yaml
           name: rabahdj_local_app
-          description: "A new Advanced Local Social Network with E2EE Encryption."
+          description: "Advanced Local Social Network with E2EE & Self-Destruct Messages."
           publish_to: 'none'
-          version: 1.4.0+5
+          version: 1.5.0+6
 
           environment:
             sdk: '>=3.0.0 <4.0.0'
@@ -55,7 +55,7 @@ jobs:
             sqflite: ^2.3.0
             path: ^1.8.3
             nsd: ^1.2.2
-            encrypt: ^5.0.3        # [جديد] حزمة تشفير البيانات والرسائل محلياً
+            encrypt: ^5.0.3
 
           dev_dependencies:
             flutter_test:
@@ -66,7 +66,7 @@ jobs:
             uses-material-design: true
           EOF
 
-      - name: 📲 Inject Ultra App UI with Profile & WiFi Secure E2EE
+      - name: 📲 Inject Ultra App UI with Self-Destruct Private Chat
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -80,6 +80,7 @@ jobs:
           import 'package:encrypt/encrypt.dart' as enc;
           import 'dart:convert';
           import 'dart:io';
+          import 'dart:async';
 
           final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
           IO.Socket? socket;
@@ -90,32 +91,25 @@ jobs:
           String myUsername = "مستخدم محلي";
           String? myProfileB64;
 
-          // إعداد مفتاح التشفير السري الموحد للشبكة المحلية (AES-256)
-          final encKey = enc.Key.fromUtf8('my32bytesecretkeyforrabahdjlocal'); // يجب أن يكون 32 حرفاً
-          final encIv = enc.IV.fromUtf8('16byteslonginitiv'); // يجب أن يكون 16 حرفاً
+          final encKey = enc.Key.fromUtf8('my32bytesecretkeyforrabahdjlocal'); 
+          final encIv = enc.IV.fromUtf8('16byteslonginitiv'); 
 
-          // دالة تشفير النصوص قبل إرسالها للواي فاي
           String encryptText(String plainText) {
             final encrypter = enc.Encrypter(enc.AES(encKey));
-            final encrypted = encrypter.encrypt(plainText, iv: encIv);
-            return encrypted.base64;
+            return encrypter.encrypt(plainText, iv: encIv).base64;
           }
 
-          // دالة فك التشفير عند استقبال النص
           String decryptText(String encryptedBase64) {
             try {
               final encrypter = enc.Encrypter(enc.AES(encKey));
               return encrypter.decrypt64(encryptedBase64, iv: encIv);
-            } catch (e) {
-              return "[رسالة مشفرة لا يمكن قراءتها]";
-            }
+            } catch (e) { return "[فشل فك التشفير]"; }
           }
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-            const InitializationSettings initializationSettings = InitializationSettings(android: androidDetails);
-            final InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             await _localNotificationsPlugin.initialize(initializationSettings);
             runApp(const MyApp());
           }
@@ -128,8 +122,7 @@ jobs:
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData(
                   colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2), brightness: Brightness.dark),
-                  useMaterial3: true,
-                  scaffoldBackgroundColor: const Color(0xFF18191A),
+                  useMaterial3: true, scaffoldBackgroundColor: const Color(0xFF18191A),
                 ),
                 home: const MainNavigationScreen(),
               );
@@ -185,7 +178,7 @@ jobs:
                 if (mounted) {
                   setState(() {
                     var decryptedPost = Map<String, dynamic>.from(data);
-                    decryptedPost['content'] = decryptText(decryptedPost['content']); // فك تشفير محتوى المنشور
+                    decryptedPost['content'] = decryptText(decryptedPost['content']);
                     localFeedPosts.insert(0, decryptedPost);
                   });
                 }
@@ -195,8 +188,7 @@ jobs:
                 if (mounted) {
                   setState(() {
                     localFeedPosts = List<Map<String, dynamic>>.from(data).map((post) {
-                      post['content'] = decryptText(post['content']);
-                      return post;
+                      post['content'] = decryptText(post['content']); return post;
                     }).toList();
                   });
                 }
@@ -220,20 +212,34 @@ jobs:
                   setState(() {
                     String senderId = data['senderId'];
                     if (!privateMessages.containsKey(senderId)) { privateMessages[senderId] = []; }
-                    // فك تشفير الرسالة الخاصة المستلمة قبل عرضها على الشاشة
                     String decryptedMsg = decryptText(data['text']);
-                    privateMessages[senderId]!.add({'sender': data['senderName'], 'text': decryptedMsg, 'isMe': false});
+                    privateMessages[senderId]!.add({
+                      'id': data['id'], // المَعرف الفريد للرسالة لتدميرها
+                      'sender': data['senderName'],
+                      'text': decryptedMsg,
+                      'isMe': false,
+                      'timer': 5 // مؤقت التدمير الذاتي المبدئي للرسالة المستلمة
+                    });
                   });
-                  _showNotification("قفل أمان 🔐", "وصلتك رسالة خاصة مشفرة بالكامل");
                 }
               });
-            }
 
-            Future<void> _showNotification(String title, String body) async {
-              const AndroidNotificationDetails androidDetails = AndroidNotificationDetails('private_ch_id', 'Private Alerts', importance: Importance.max, priority: Priority.high);
-              await _localNotificationsPlugin.show(1, title, body, const NotificationDetails(android: androidDetails));
+              // [جديد] استقبال أمر حذف الرسالة الحية من الطرف الآخر وتدميرها فوراً من الشاشة
+              socket!.on('destroy_message_event', (data) {
+                if (mounted) {
+                  setState(() {
+                    String fromId = data['fromId'];
+                    String msgId = data['msgId'];
+                    if (privateMessages.containsKey(fromId)) {
+                      privateMessages[fromId]!.removeWhere((m) => m['id'] == msgId);
+                    }
+                  });
+                }
+              });
             }
 
             @override
             Widget build(BuildContext context) {
               final List<Widget> screens = [
+                HomeScreen(isConnected: _isConnected, isSearching: _isSearching, ipController: _ipController, nameController: _nameController, onConnect: connectToServer, onAutoDiscover: startAutoDiscovery),
+                const FeedScreen(), const PrivateChatsListScreen(), const FileSharingHubScreen()
