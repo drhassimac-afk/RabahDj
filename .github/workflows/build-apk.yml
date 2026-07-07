@@ -37,7 +37,7 @@ jobs:
           name: rabahdj_local_app
           description: "A new Advanced Local Social Network."
           publish_to: 'none'
-          version: 1.1.0+2
+          version: 1.2.0+3
 
           environment:
             sdk: '>=3.0.0 <4.0.0'
@@ -72,7 +72,6 @@ jobs:
           import 'package:flutter_local_notifications/flutter_local_notifications.dart';
           import 'package:socket_io_client/socket_io_client.dart' as IO;
           import 'package:uuid/uuid.dart';
-          import 'package:http/http.dart' as http;
           import 'package:image_picker/image_picker.dart';
           import 'package:nsd/nsd.dart' as nsd;
           import 'dart:convert';
@@ -83,6 +82,7 @@ jobs:
           String currentServerIp = "192.168.1.10";
           List<Map<String, dynamic>> localFeedPosts = []; 
           List<String> connectedUsers = [];
+          Map<String, List<Map<String, dynamic>>> privateChatsStorage = {}; // حفظ الرسائل الخاصة لكل مستخدم
           String myUsername = "مستخدم محلي";
           String? myProfileB64;
 
@@ -123,11 +123,9 @@ jobs:
             final TextEditingController _ipController = TextEditingController(text: currentServerIp);
             final TextEditingController _nameController = TextEditingController(text: myUsername);
 
-            // دالة البحث التلقائي عن السيرفر في الشبكة المحلية عبر بروتوكول mDNS
             Future<void> startAutoDiscovery() async {
               setState(() { _isSearching = true; });
               try {
-                // البحث عن خدمة مسجلة بنوع _rabahdj._tcp (سنقوم بإعداد السيرفر ليبث هذا الاسم)
                 final discovery = await nsd.startDiscovery('_rabahdj._tcp');
                 discovery.addListener(() {
                   if (discovery.services.isNotEmpty) {
@@ -135,40 +133,22 @@ jobs:
                     if (service.addresses.isNotEmpty) {
                       final foundIp = service.addresses.first.address;
                       nsd.stopDiscovery(discovery);
-                      setState(() {
-                        _ipController.text = foundIp;
-                        _isSearching = false;
-                      });
-                      connectToServer(); // الاتصال التلقائي فور العثور عليه
+                      setState(() { _ipController.text = foundIp; _isSearching = false; });
+                      connectToServer();
                     }
                   }
                 });
-                
-                // التوقف التلقائي عن البحث بعد 10 ثوانٍ لتوفير بطارية الهاتف
-                await Future.delayed(const Duration(seconds: 10));
+                await Future.delayed(const Duration(seconds: 8));
                 nsd.stopDiscovery(discovery);
-                if (mounted && _isSearching) {
-                  setState(() { _isSearching = false; });
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على سيرفر تلقائياً، جرب إدخال الـ IP يدوياً')));
-                }
-              } catch (e) {
-                setState(() { _isSearching = false; });
-              }
+                if (mounted && _isSearching) setState(() => _isSearching = false);
+              } catch (e) { setState(() => _isSearching = false); }
             }
 
             void connectToServer() {
               if (socket != null) { socket!.disconnect(); socket!.dispose(); }
+              setState(() { currentServerIp = _ipController.text.trim(); myUsername = _nameController.text.trim(); });
 
-              setState(() {
-                currentServerIp = _ipController.text.trim();
-                myUsername = _nameController.text.trim();
-              });
-
-              socket = IO.io('http://$currentServerIp:4000', IO.OptionBuilder()
-                .setTransports(['websocket'])
-                .disableAutoConnect()
-                .build());
-
+              socket = IO.io('http://$currentServerIp:4000', IO.OptionBuilder().setTransports(['websocket']).disableAutoConnect().build());
               socket!.connect();
 
               socket!.onConnect((_) {
@@ -179,36 +159,53 @@ jobs:
               socket!.onDisconnect((_) => setState(() => _isConnected = false));
 
               socket!.on('new_post', (data) {
-                if (mounted) {
-                  setState(() { localFeedPosts.insert(0, Map<String, dynamic>.from(data)); });
-                }
+                if (mounted) setState(() => localFeedPosts.insert(0, Map<String, dynamic>.from(data)));
               });
 
               socket!.on('post_liked', (data) {
                 if (mounted) {
                   setState(() {
                     final index = localFeedPosts.indexWhere((p) => p['id'] == data['postId']);
-                    if (index != -1) { localFeedPosts[index]['likes'] = data['likesCount']; }
+                    if (index != -1) localFeedPosts[index]['likes'] = data['likesCount'];
                   });
                 }
               });
 
               socket!.on('users_list', (data) {
-                if (mounted) setState(() => connectedUsers = List<String>.from(data));
+                if (mounted) {
+                  setState(() {
+                    connectedUsers = List<String>.from(data)..remove(myUsername); // إزالة اسمي من القائمة المعروضة للدردشة المعاكسة
+                  });
+                }
+              });
+
+              // [جديد] استقبال الرسائل الخاصة الفورية من السيرفر وتصنيفها بناءً على الشخص الآخر
+              socket!.on('new_private_message', (data) {
+                if (mounted) {
+                  setState(() {
+                    final msg = Map<String, dynamic>.from(data);
+                    String partner = msg['sender'] == myUsername ? msg['receiver'] : msg['sender'];
+                    if (!privateChatsStorage.containsKey(partner)) privateChatsStorage[partner] = [];
+                    privateChatsStorage[partner]!.add(msg);
+                  });
+                }
+              });
+
+              // استقبال الأرشيف التاريخي للدردشة الخاصة من قاعدة البيانات
+              socket!.on('private_history', (data) {
+                if (mounted) {
+                  setState(() {
+                    String partner = data['other'];
+                    privateChatsStorage[partner] = List<Map<String, dynamic>>.from(data['messages']);
+                  });
+                }
               });
             }
 
             @override
             Widget build(BuildContext context) {
               final List<Widget> screens = [
-                HomeScreen(
-                  isConnected: _isConnected, 
-                  isSearching: _isSearching,
-                  ipController: _ipController, 
-                  nameController: _nameController, 
-                  onConnect: connectToServer,
-                  onAutoDiscover: startAutoDiscovery,
-                ),
+                HomeScreen(isConnected: _isConnected, isSearching: _isSearching, ipController: _ipController, nameController: _nameController, onConnect: connectToServer, onAutoDiscover: startAutoDiscovery),
                 const FeedScreen(), 
                 const ProfileScreen()
               ];
@@ -223,7 +220,7 @@ jobs:
                   backgroundColor: const Color(0xFF242526),
                   type: BottomNavigationBarType.fixed,
                   items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.wifi_protected_setup), label: 'الشبكة'),
+                    BottomNavigationBarItem(icon: Icon(Icons.forum), label: 'الشبكة والدردشة'),
                     BottomNavigationBarItem(icon: Icon(Icons.dynamic_feed), label: 'الخلاصة'),
                     BottomNavigationBarItem(icon: Icon(Icons.account_circle), label: 'حسابي'),
                   ],
@@ -240,21 +237,8 @@ jobs:
             final VoidCallback onConnect;
             final VoidCallback onAutoDiscover;
 
-            const HomeScreen({
-              super.key, 
-              required this.isConnected, 
-              required this.isSearching,
-              required this.ipController, 
-              required this.nameController, 
-              required this.onConnect,
-              required this.onAutoDiscover,
-            });
+            const HomeScreen({super.key, required this.isConnected, required this.isSearching, required this.ipController, required this.nameController, required this.onConnect, required this.onAutoDiscover});
 
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('بوابة اتصال RabahDj'), backgroundColor: const Color(0xFF242526)),
-                body: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: SingleChildScrollView(
-                    child: Column(
