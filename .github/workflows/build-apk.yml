@@ -35,9 +35,9 @@ jobs:
         run: |
           cat << 'EOF' > pubspec.yaml
           name: rabahdj_local_app
-          description: "A new Advanced Local Social Network."
+          description: "Ultimate Offline Local Social Network."
           publish_to: 'none'
-          version: 1.3.0+4
+          version: 1.4.0+5
 
           environment:
             sdk: '>=3.0.0 <4.0.0'
@@ -65,7 +65,7 @@ jobs:
             uses-material-design: true
           EOF
 
-      - name: 📲 Inject Ultra App UI with Profile & WiFi File Sharing Hub
+      - name: 📲 Inject Ultra App UI with Profile, Stories & WiFi Hub
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -83,6 +83,7 @@ jobs:
           IO.Socket? socket;
           String currentServerIp = "192.168.1.10";
           List<Map<String, dynamic>> localFeedPosts = []; 
+          List<Map<String, dynamic>> localStories = []; // [جديد] قائمة الحالات والقصص اليومية
           List<Map<String, dynamic>> activeUsersWithIds = []; 
           Map<String, List<Map<String, dynamic>>> privateMessages = {}; 
           String myUsername = "مستخدم محلي";
@@ -143,7 +144,6 @@ jobs:
                     }
                   }
                 });
-                
                 await Future.delayed(const Duration(seconds: 8));
                 nsd.stopDiscovery(discovery);
                 if (mounted && _isSearching) { setState(() { _isSearching = false; }); }
@@ -152,7 +152,6 @@ jobs:
 
             void connectToServer() {
               if (socket != null) { socket!.disconnect(); socket!.dispose(); }
-
               setState(() {
                 currentServerIp = _ipController.text.trim();
                 myUsername = _nameController.text.trim();
@@ -176,8 +175,18 @@ jobs:
                 if (mounted) setState(() { localFeedPosts.insert(0, Map<String, dynamic>.from(data)); });
               });
 
-              socket!.on('initial_feed', (data) {
-                if (mounted) setState(() { localFeedPosts = List<Map<String, dynamic>>.from(data); });
+              // [جديد] استقبال قصة جديدة معروضة بالشبكة
+              socket!.on('new_story', (data) {
+                if (mounted) setState(() { localStories.insert(0, Map<String, dynamic>.from(data)); });
+              });
+
+              socket!.on('initial_data', (data) {
+                if (mounted) {
+                  setState(() {
+                    localFeedPosts = List<Map<String, dynamic>>.from(data['posts']);
+                    localStories = List<Map<String, dynamic>>.from(data['stories']);
+                  });
+                }
               });
 
               socket!.on('post_liked', (data) {
@@ -197,9 +206,8 @@ jobs:
                 if (mounted) {
                   setState(() {
                     String senderId = data['senderId'];
-                    String senderName = data['senderName'];
                     if (!privateMessages.containsKey(senderId)) { privateMessages[senderId] = []; }
-                    privateMessages[senderId]!.add({'sender': senderName, 'text': data['text'], 'isMe': false});
+                    privateMessages[senderId]!.add({'sender': data['senderName'], 'text': data['text'], 'isMe': false});
                   });
                   _showNotification("رسالة خاصة جديدة", "وصلتك رسالة من ${data['senderName']}");
                 }
@@ -219,7 +227,7 @@ jobs:
                 HomeScreen(isConnected: _isConnected, isSearching: _isSearching, ipController: _ipController, nameController: _nameController, onConnect: connectToServer, onAutoDiscover: startAutoDiscovery),
                 const FeedScreen(), 
                 const PrivateChatsListScreen(), 
-                const FileSharingHubScreen() // [جديد] شاشة مركز مشاركة وتنزيل الملفات
+                const FileSharingHubScreen()
               ];
 
               return Scaffold(
@@ -234,12 +242,3 @@ jobs:
                   items: const [
                     BottomNavigationBarItem(icon: Icon(Icons.wifi_protected_setup), label: 'الشبكة'),
                     BottomNavigationBarItem(icon: Icon(Icons.dynamic_feed), label: 'الخلاصة'),
-                    BottomNavigationBarItem(icon: Icon(Icons.mail_outline), label: 'الرسائل'),
-                    BottomNavigationBarItem(icon: Icon(Icons.folder_shared), label: 'الملفات'),
-                  ],
-                ),
-              );
-            }
-          }
-
-          class HomeScreen extends StatelessWidget {
