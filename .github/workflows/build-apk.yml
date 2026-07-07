@@ -28,9 +28,7 @@ jobs:
 
       - name: 🏗️ Create Fresh Flutter Project
         run: |
-          # تنظيف المجلد الحالي بأمان
           find . -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} +
-          # إنشاء المشروع مباشرة مع دعم خيار التحديث الرسمي
           flutter create . --org com.example --project-name rabahdj_local_app --platforms=android --overwrite
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
@@ -129,6 +127,7 @@ jobs:
                 myUsername = _nameController.text.trim();
               });
 
+              // إعداد الاتصال بالـ Socket.io عبر الـ IP المحلي
               socket = IO.io('http://$currentServerIp:4000', IO.OptionBuilder()
                 .setTransports(['websocket'])
                 .disableAutoConnect()
@@ -146,6 +145,7 @@ jobs:
                 setState(() => _isConnected = false);
               });
 
+              // استقبال الرسائل الفورية وتحديث الواجهة
               socket!.on('message', (data) {
                 if (mounted) {
                   setState(() {
@@ -154,6 +154,7 @@ jobs:
                 }
               });
 
+              // استقبال قائمة المستخدمين النشطين على الشبكة المحلية
               socket!.on('users_list', (data) {
                 if (mounted) {
                   setState(() {
@@ -198,6 +199,7 @@ jobs:
             }
           }
 
+          // شاشة التحكم في الاتصال وعرض إحصائيات الشبكة والمنشورات
           class HomeScreen extends StatelessWidget {
             final bool isConnected;
             final TextEditingController ipController;
@@ -236,5 +238,3 @@ jobs:
                       const SizedBox(height: 16),
                       const Divider(),
                       Expanded(
-                        child: connectedUsers.isEmpty
-                            ? const Center(child: Text('لا يوجد مستخدمين آخرين متصلين حالياً'))
