@@ -28,10 +28,11 @@ jobs:
 
       - name: 🏗️ Create Fresh Flutter Project
         run: |
-          # تنظيف المجلد الحالي بأمان دون حذف ملفات النظام الأساسية للـ Runner
+          # تنظيف الملفات الظاهرة والمخفية بأمان دون لمس ملفات نظام الخادم
           find . -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} +
-          # إنشاء المشروع مباشرة في المجلد الحالي لتجنب مشاكل النقل والحذف
-          flutter create . --org com.example --project-name rabahdj_local_app --platforms=android --force
+          # استخدام خيار --overwrite البديل والصحيح تقنياً لإنشاء المشروع في المجلد الحالي
+          flutter create . --org com.example --project-name rabahdj_local_app --platforms=android --overwrite
+
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
