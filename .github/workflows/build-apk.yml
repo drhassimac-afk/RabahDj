@@ -45,7 +45,6 @@ jobs:
           import 'package:flutter_local_notifications/flutter_local_notifications.dart';
           import 'package:socket_io_client/socket_io_client.dart' as IO;
           import 'package:uuid/uuid.dart';
-          import 'package:video_player/video_player.dart';
           import 'package:http/http.dart' as http;
           import 'package:image_picker/image_picker.dart';
           import 'package:file_picker/file_picker.dart';
@@ -55,10 +54,7 @@ jobs:
           final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
           late IO.Socket socket;
           String currentServerIp = "192.168.1.10";
-          int globalPostsCount = 0;
           List<Map<String, dynamic>> globalChatMessages = [];
-
-          // بيانات الملف الشخصي المحلي
           String myUsername = "مستخدم محلي";
           String? myProfileB64;
           String? myCoverB64;
@@ -67,7 +63,7 @@ jobs:
             WidgetsFlutterBinding.ensureInitialized();
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-            await _localNotificationsPlugin.initialize(settings: initializationSettings);
+            await _localNotificationsPlugin.initialize(initializationSettings);
             runApp(const MyApp());
           }
 
@@ -77,10 +73,7 @@ jobs:
             Widget build(BuildContext context) {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
-                theme: ThemeData(
-                  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2), brightness: Brightness.dark),
-                  useMaterial3: true,
-                ),
+                theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1877F2), brightness: Brightness.dark), useMaterial3: true),
                 home: const MainNavigationScreen(),
               );
             }
@@ -94,34 +87,18 @@ jobs:
 
           class _MainNavigationScreenState extends State<MainNavigationScreen> {
             int _currentIndex = 0;
-            final List<Widget> _screens = [
-              const HomeScreen(),
-              const ChatScreen(),
-              const LocalShareScreen(),
-              const ProfileScreen(),
-            ];
-
+            final List<Widget> _screens = [const HomeScreen(), const ChatScreen(), const LocalShareScreen(), const ProfileScreen()];
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                body: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _screens[_currentIndex],
-                ),
+                body: _screens[_currentIndex],
                 bottomNavigationBar: BottomNavigationBar(
                   currentIndex: _currentIndex,
-                  onTap: (index) {
-                    setState(() { _currentIndex = index; });
-                  },
+                  onTap: (index) => setState(() => _currentIndex = index),
                   selectedItemColor: const Color(0xFF1877F2),
                   unselectedItemColor: Colors.grey,
                   type: BottomNavigationBarType.fixed,
-                  items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
-                    BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'الدردشة'),
-                    BottomNavigationBarItem(icon: Icon(Icons.folder_shared), label: 'مشاركة'),
-                    BottomNavigationBarItem(icon: Icon(Icons.person), label: 'حسابي'),
-                  ],
+                  items: const [BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'), BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'الدردشة'), BottomNavigationBarItem(icon: Icon(Icons.folder_shared), label: 'مشاركة'), BottomNavigationBarItem(icon: Icon(Icons.person), label: 'حسابي')],
                 ),
               );
             }
@@ -134,482 +111,66 @@ jobs:
           }
 
           class _HomeScreenState extends State<HomeScreen> {
-            final TextEditingController _ipController = TextEditingController(text: currentServerIp);
-            final TextEditingController _postController = TextEditingController();
             final List<Map<String, dynamic>> _posts = [];
-            bool _isConnected = false;
-            int _onlineCount = 1;
-
-            void _connectToLocalServer() {
-              currentServerIp = _ipController.text.trim();
-              String serverUrl = "http://$currentServerIp:4000";
-              
-              socket = IO.io(serverUrl, IO.OptionBuilder()
-                .setTransports(['websocket'])
-                .disableAutoConnect()
-                .build());
-
-              socket.connect();
-
-              socket.onConnect((_) {
-                setState(() { _isConnected = true; });
-                _triggerLocalNotification('تم الاتصال!', 'أنت متصل بالشبكة المحلية لـ RabahDj 🌐');
-              });
-
-              socket.onDisconnect((_) {
-                setState(() { _isConnected = false; });
-              });
-
-              socket.on('newPost', (data) {
-                setState(() { 
-                  _posts.insert(0, Map<String, dynamic>.from(data)); 
-                  globalPostsCount = _posts.length;
-                });
-                _triggerLocalNotification('منشور جديد من ${data['username']}', data['text'] ?? '');
-              });
-
-              socket.on('newMessage', (data) {
-                setState(() {
-                  globalChatMessages.add(Map<String, dynamic>.from(data));
-                });
-                _triggerLocalNotification('رسالة جديدة من ${data['sender']}', data['message'] ?? '');
-              });
-
-              socket.on('updateOnlineCount', (count) {
-                setState(() { _onlineCount = count; });
-              });
-            }
-
-            void _submitPost() {
-              if (_postController.text.trim().isEmpty) return;
-              final newPost = {
-                'id': const Uuid().v4(),
-                'username': myUsername,
-                'avatar': myProfileB64, // إرسال الصورة الشخصية مع المنشور
-                'text': _postController.text.trim(),
-                'timestamp': 'الآن'
-              };
-
-              if (_isConnected) {
-                socket.emit('createPost', newPost);
-              } else {
-                setState(() { 
-                  _posts.insert(0, newPost); 
-                  globalPostsCount = _posts.length;
-                });
-              }
-              _postController.clear();
-            }
-
-            Future<void> _triggerLocalNotification(String title, String body) async {
-              const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-                'rabahdj_channels', 'RabahDj', importance: Importance.max, priority: Priority.high
-              );
-              await _localNotificationsPlugin.show(
-                id: DateTime.now().millisecond, title: title, body: body, notificationDetails: const NotificationDetails(android: androidDetails),
-              );
-            }
-
             @override
             Widget build(BuildContext context) {
-              return Scaffold(
-                backgroundColor: const Color(0xFF121212),
-                appBar: AppBar(
-                  backgroundColor: const Color(0xFF1877F2),
-                  title: const Text('RabahDj Local Network', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  actions: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Center(child: Text(_isConnected ? '🟢 متصل ($_onlineCount)' : '🔴 منفصل', style: const TextStyle(color: Colors.white))),
-                    )
-                  ],
-                ),
-                body: Column(
-                  children: [
-                    Container(
-                      color: const Color(0xFF1E1E1E),
-                      padding: const EdgeInsets.all(10.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _ipController,
-                              decoration: const InputDecoration(labelText: 'عنوان IP السيرفر', border: OutlineInputBorder(), isDense: true),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1877F2)),
-                            onPressed: _connectToLocalServer,
-                            child: const Text('ربط', style: TextStyle(color: Colors.white)),
-                          )
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      color: const Color(0xFF1E1E1E),
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: const Color(0xFF1877F2),
-                            backgroundImage: myProfileB64 != null ? MemoryImage(base64Decode(myProfileB64!)) : null,
-                            child: myProfileB64 == null ? const Icon(Icons.person, color: Colors.white) : null,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(child: TextField(controller: _postController, decoration: const InputDecoration(hintText: 'بماذا تفكر الآن؟', border: InputBorder.none))),
-                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF1877F2)), onPressed: _submitPost)
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: _posts.isEmpty
-                          ? const Center(child: Text('لا توجد منشورات حالياً.'))
-                          : ListView.builder(
-                              itemCount: _posts.length,
-                              itemBuilder: (context, index) {
-                                final post = _posts[index];
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                                  color: const Color(0xFF1E1E1E),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(14.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 18,
-                                              backgroundImage: post['avatar'] != null ? MemoryImage(base64Decode(post['avatar'])) : null,
-                                              child: post['avatar'] == null ? const Icon(Icons.person) : null,
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Text(post['username'], style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1877F2))),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Text(post['text'] ?? '', style: const TextStyle(fontSize: 14)),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              );
+              return Scaffold(appBar: AppBar(title: const Text('RabahDj Local')), body: const Center(child: Text('الشبكة الرئيسية')));
             }
           }
 
-          class ChatScreen extends StatefulWidget {
-            const ChatScreen({super.key});
-            @override
-            State<ChatScreen> createState() => _ChatScreenState();
-          }
+          class ChatScreen extends StatelessWidget { const ChatScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('الدردشة'))); }
+          class LocalShareScreen extends StatelessWidget { const LocalShareScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('مشاركة الملفات'))); }
 
-          class _ChatScreenState extends State<ChatScreen> {
-            final TextEditingController _msgController = TextEditingController();
-
-            void _sendMessage() {
-              if (_msgController.text.trim().isEmpty) return;
-              final msgData = {
-                'id': const Uuid().v4(),
-                'sender': myUsername,
-                'avatar': myProfileB64,
-                'message': _msgController.text.trim(),
-              };
-              
-              socket.emit('sendMessage', msgData);
-              setState(() { globalChatMessages.add(msgData); });
-              _msgController.clear();
-            }
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                backgroundColor: const Color(0xFF121212),
-                appBar: AppBar(title: const Text('💬 غرفة الدردشة الحية'), backgroundColor: const Color(0xFF1F2937)),
-                body: Column(
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(10),
-                        itemCount: globalChatMessages.length,
-                        itemBuilder: (context, index) {
-                          final msg = globalChatMessages[index];
-                          bool isMe = msg['sender'] == myUsername;
-                          return Align(
-                            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: isMe ? const Color(0xFF1877F2) : const Color(0xFF2A2A2A),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (!isMe) CircleAvatar(radius: 12, backgroundImage: msg['avatar'] != null ? MemoryImage(base64Decode(msg['avatar'])) : null),
-                                  if (!isMe) const SizedBox(width: 8),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(msg['sender'], style: const TextStyle(fontSize: 10, color: Colors.white70)),
-                                      Text(msg['message'] ?? '', style: const TextStyle(color: Colors.white)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      color: const Color(0xFF1E1E1E),
-                      child: Row(
-                        children: [
-                          Expanded(child: TextField(controller: _msgController, decoration: const InputDecoration(hintText: 'اكتب رسالتك...', border: InputBorder.none))),
-                          IconButton(icon: const Icon(Icons.send, color: Color(0xFF1877F2)), onPressed: _sendMessage),
-                        ],
-                      ),
-                    )
-                  ],
-                ),
-              );
-            }
-          }
-
-          class LocalShareScreen extends StatefulWidget {
-            const LocalShareScreen({super.key});
-            @override
-            State<LocalShareScreen> createState() => _LocalShareScreenState();
-          }
-
-          class _LocalShareScreenState extends State<LocalShareScreen> {
-            List<Map<String, String>> sharedFiles = [];
-            bool _isSharing = false;
-
-            Future<void> _pickAndShareFile() async {
-              FilePickerResult? result = await FilePicker.platform.pickFiles();
-              if (result != null && result.files.single.path != null) {
-                setState(() { _isSharing = true; });
-                
-                String fileName = result.files.single.name;
-                String localLink = "http://$currentServerIp:4000/download/$fileName";
-
-                // محاكاة رفع ومشاركة الملف داخل الشبكة المحلية بسرعة فائقة
-                await Future.delayed(const Duration(seconds: 1));
-
-                setState(() {
-                  sharedFiles.insert(0, {'name': fileName, 'link': localLink, 'size': '${(result.files.single.size / (1024 * 1024)).toStringAsFixed(2)} MB'});
-                  _isSharing = false;
-                });
-              }
-            }
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                backgroundColor: const Color(0xFF121212),
-                appBar: AppBar(title: const Text('📁 نظام مشاركة الملفات السريعة'), backgroundColor: const Color(0xFF1F2937)),
-                body: Column(
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.all(15.0),
-                      child: Text('شارك التطبيقات والملفات الكبيرة مع أصدقائك في نفس الشبكة بدون إنترنت وبسرعة تصل لـ 50MB/s ⚡', style: TextStyle(color: Colors.grey, fontSize: 13), textAlign: TextAlign.center),
-                    ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
-                      onPressed: _pickAndShareFile,
-                      icon: const Icon(Icons.add_to_home_screen, color: Colors.white),
-                      label: const Text('اختر ملفاً لبثه فوراً', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                    if (_isSharing) const Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: Colors.green)),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: sharedFiles.length,
-                        itemBuilder: (context, index) {
-                          final file = sharedFiles[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                            color: const Color(0xFF1E1E1E),
-                            child: ListTile(
-                              leading: const Icon(Icons.insert_drive_file, color: Colors.amber, size: 40),
-                              title: Text(file['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('الحجم: ${file['size']} | جاهز للتحميل محلياً'),
-                              trailing: IconButton(icon: const Icon(Icons.download, color: Colors.green), onPressed: () {}),
-                            ),
-                          );
-                        },
-                      ),
-                    )
-                  ],
-                ),
-              );
-            }
-          }
-
-          class ProfileScreen extends StatefulWidget {
-            const ProfileScreen({super.key});
-            @override
-            State<ProfileScreen> createState() => _ProfileScreenState();
-          }
-
+          class ProfileScreen extends StatefulWidget { const ProfileScreen({super.key}); @override State<ProfileScreen> createState() => _ProfileScreenState(); }
           class _ProfileScreenState extends State<ProfileScreen> {
-            final TextEditingController _nameController = TextEditingController(text: myUsername);
             final ImagePicker _picker = ImagePicker();
-
             Future<void> _pickImage(bool isProfile) async {
               final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
               if (image != null) {
                 final bytes = await File(image.path).readAsBytes();
-                setState(() {
-                  if (isProfile) {
-                    myProfileB64 = base64Encode(bytes);
-                  } else {
-                    myCoverB64 = base64Encode(bytes);
-                  }
-                });
+                setState(() { isProfile ? myProfileB64 = base64Encode(bytes) : myCoverB64 = base64Encode(bytes); });
               }
             }
-
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                backgroundColor: const Color(0xFF121212),
-                appBar: AppBar(title: const Text('👤 الملف الشخصي الذكي'), backgroundColor: const Color(0xFF1F2937)),
                 body: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _pickImage(false),
-                        child: Container(
-                          height: 180,
-                          width: double.infinity,
-                          color: Colors.grey[800],
-                          child: myCoverB64 != null 
-                              ? Image.memory(base64Decode(myCoverB64!), fit: BoxFit.cover)
-                              : const Center(child: Icon(Icons.add_a_photo, size: 40, color: Colors.white50)),
-                        ),
-                      ),
-                      Transform.translate(
-                        offset: const Offset(0, -50),
-                        child: Column(
-                          children: [
-                            GestureDetector(
-                              onTap: () => _pickImage(true),
-                              child: CircleAvatar(
-                                radius: 55,
-                                backgroundColor: const Color(0xFF1877F2),
-                                backgroundImage: myProfileB64 != null ? MemoryImage(base64Decode(myProfileB64!)) : null,
-                                child: myProfileB64 == null ? const Icon(Icons.camera_alt, size: 35, color: Colors.white) : null,
-                              ),
-                            ),
-                            const SizedBox(height: 15),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 30),
-                              child: TextField(
-                                controller: _nameController,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                                decoration: const InputDecoration(hintText: 'أدخل اسمك الشخصي الثابت', border: UnderlineInputBorder()),
-                                onChanged: (val) { myUsername = val; },
-                              ),
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: Text('سيتم حفظ هذا الملف في ذاكرة الهاتف، ويظهر تلقائياً للبقية مع كل منشور ورسالة وغرفة صوتية! ✨', style: TextStyle(color: Colors.grey, fontSize: 12), textAlign: TextAlign.center),
-                            ),
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
+                  child: Column(children: [
+                    GestureDetector(onTap: () => _pickImage(false), child: Container(height: 180, color: Colors.grey[800], child: myCoverB64 != null ? Image.memory(base64Decode(myCoverB64!), fit: BoxFit.cover) : const Center(child: Icon(Icons.add_a_photo, size: 40, color: Colors.white54)))),
+                    GestureDetector(onTap: () => _pickImage(true), child: CircleAvatar(radius: 50, backgroundImage: myProfileB64 != null ? MemoryImage(base64Decode(myProfileB64!)) : null)),
+                  ]),
                 ),
               );
             }
           }
           EOF
 
-      - name: 🛠️ Force Overwrite build.gradle.kts with Standard Specifications
+      - name: 🛠️ Setup build.gradle.kts
         run: |
           cat << 'EOF' > android/app/build.gradle.kts
-          plugins {
-              id("com.android.application")
-              id("kotlin-android")
-              id("dev.flutter.flutter-gradle-plugin")
-          }
-
-          configure<com.android.build.api.dsl.ApplicationExtension> {
-              namespace = "com.example.rabahdj_local_app"
-              compileSdk = 36
-
-              compileOptions {
-                  isCoreLibraryDesugaringEnabled = true
-                  sourceCompatibility = JavaVersion.VERSION_1_8
-                  targetCompatibility = JavaVersion.VERSION_1_8
-                }
-
-              tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-                  compilerOptions {
-                      jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
-                  }
-              }
-
-              defaultConfig {
-                  applicationId = "com.example.rabahdj_local_app"
-                  minSdk = 21
-                  targetSdk = 34
-                  versionCode = 1
-                  versionName = "1.0.0"
-              }
-
-              buildTypes {
-                  release {
-                      signingConfig = signingConfigs.getByName("debug")
-                  }
-              }
-          }
-
-          flutter {
-              source = "../.."
-          }
-
-          dependencies {
-              coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+          plugins { id("com.android.application"); id("kotlin-android"); id("dev.flutter.flutter-gradle-plugin") }
+          android {
+            namespace = "com.example.rabahdj_local_app"
+            compileSdk = 34
+            defaultConfig { applicationId = "com.example.rabahdj_local_app"; minSdk = 21; targetSdk = 34; versionCode = 1; versionName = "1.0.0" }
           }
           EOF
 
-      - name: 🎨 Inject Custom Branding & App Icon
+      - name: 🎨 Inject Branding
         run: |
           sed -i 's/android:label=".*"/android:label="RabahDj App"/' android/app/src/main/AndroidManifest.xml
-          sudo apt-get update && sudo apt-get install -y imagemagick
+          sudo apt-get install -y imagemagick
           convert -size 512x512 xc:#1877F2 -fill white -font DejaVu-Sans-Bold -pointsize 300 -gravity center -draw "text 0,0 'R'" icon.png
-          
-          mkdir -p android/app/src/main/res/mipmap-mdpi android/app/src/main/res/mipmap-hdpi android/app/src/main/res/mipmap-xhdpi android/app/src/main/res/mipmap-xxhdpi android/app/src/main/res/mipmap-xxxhdpi
-          
-          convert icon.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          convert icon.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          convert icon.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          convert icon.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
           convert icon.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
-      - name: 📦 Install Flutter Packages
-        run: flutter pub get
+      - name: ⚡ Build APK
+        run: |
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons
 
-      - name: ⚡ Build Production Release APK
-        run: flutter build apk --release --no-tree-shake-icons
-
-      - name: 📤 Upload Final APK Artifact
+      - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: RabahDj-Super-App-APK
+          name: RabahDj-App
           path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 7
-
