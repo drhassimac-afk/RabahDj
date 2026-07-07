@@ -45,6 +45,7 @@ jobs:
           dependencies:
             flutter:
               sdk: flutter
+            flutter_local_notifications: ^22.0.1
             socket_io_client: ^3.1.1
             uuid: ^4.3.3
             video_player: ^2.9.2
@@ -53,7 +54,7 @@ jobs:
             file_picker: ^8.1.4
             sqflite: ^2.3.0
             path: ^1.8.3
-            nsd: ^5.0.1
+            nsd: ^1.2.2
 
           dev_dependencies:
             flutter_test:
@@ -68,6 +69,7 @@ jobs:
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
+          import 'package:flutter_local_notifications/flutter_local_notifications.dart';
           import 'package:socket_io_client/socket_io_client.dart' as IO;
           import 'package:uuid/uuid.dart';
           import 'package:http/http.dart' as http;
@@ -76,6 +78,7 @@ jobs:
           import 'dart:convert';
           import 'dart:io';
 
+          final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
           IO.Socket? socket;
           String currentServerIp = "192.168.1.10";
           List<Map<String, dynamic>> activeUsersList = []; 
@@ -85,6 +88,9 @@ jobs:
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
+            const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+            await _localNotificationsPlugin.initialize(initializationSettings);
             runApp(const MyApp());
           }
 
@@ -209,110 +215,3 @@ jobs:
               if (pickResult != null && pickResult.files.single.path != null) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جارٍ رفع الملف عبر الواي فاي محلياً...')));
                 try {
-                  var request = http.MultipartRequest('POST', Uri.parse('http://$currentServerIp:4000/upload-file'));
-                  request.files.add(await http.MultipartFile.fromPath('file', pickResult.files.single.path!));
-                  var response = await request.send();
-                  if (response.statusCode == 200) {
-                    _refreshFiles();
-                    if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الملف بنجاح! 🚀')));
-                  }
-                } catch (e) {
-                  if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
-                }
-              }
-            }
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('مركز مشاركة الملفات المحلية'), backgroundColor: const Color(0xFF242526), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _refreshFiles)]),
-                body: _loading 
-                    ? const Center(child: CircularProgressIndicator()) 
-                    : _sharedFiles.isEmpty 
-                        ? const Center(child: Text('لا توجد ملفات مشتركة حالياً بالشبكة'))
-                        : ListView.builder(
-                            itemCount: _sharedFiles.length,
-                            itemBuilder: (context, index) {
-                              final file = _sharedFiles[index];
-                              return ListTile(
-                                leading: const Icon(Icons.insert_drive_file, color: Color(0xFF1877F2)),
-                                title: Text(file['name'] ?? 'ملف غير معروف'),
-                                subtitle: Text('الحجم: ${file['size'] ?? 'غير معروف'}'),
-                                trailing: IconButton(icon: const Icon(Icons.download), onPressed: () {}),
-                              );
-                            },
-                          ),
-                floatingActionButton: FloatingActionButton(onPressed: _pickAndUploadFile, backgroundColor: const Color(0xFF1877F2), child: const Icon(Icons.add, color: Colors.white)),
-              );
-            }
-          }
-
-          class ProfileScreen extends StatefulWidget {
-            const ProfileScreen({super.key});
-            @override
-            State<ProfileScreen> createState() => _ProfileScreenState();
-          }
-
-          class _ProfileScreenState extends State<ProfileScreen> {
-            final ImagePicker _picker = ImagePicker();
-            Future<void> _pickImage(bool isProfile) async {
-              final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
-              if (image != null) {
-                final bytes = await File(image.path).readAsBytes();
-                setState(() { isProfile ? myProfileB64 = base64Encode(bytes) : myCoverB64 = base64Encode(bytes); });
-              }
-            }
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('الملف الشخصي الشبكي'), backgroundColor: const Color(0xFF242526)),
-                body: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _pickImage(false), 
-                        child: Container(height: 180, color: Colors.grey[800], child: myCoverB64 != null ? Image.memory(base64Decode(myCoverB64!), fit: BoxFit.cover, width: double.infinity) : const Center(child: Icon(Icons.add_a_photo, size: 40, color: Colors.white54)))),
-                      const SizedBox(height: -50),
-                      GestureDetector(
-                        onTap: () => _pickImage(true), 
-                        child: CircleAvatar(radius: 50, backgroundColor: const Color(0xFF242526), child: CircleAvatar(radius: 46, backgroundImage: myProfileB64 != null ? MemoryImage(base64Decode(myProfileB64!)) : null))),
-                      const SizedBox(height: 16),
-                      Text(myUsername, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      const Text('مستخدم نشط بالشبكة المحلية', style: TextStyle(color: Colors.grey)),
-                    ],
-                  ),
-                ),
-              );
-            }
-          }
-          EOF
-
-      - name: 🛠️ Setup build.gradle.kts
-        run: |
-          cat << 'EOF' > android/app/build.gradle.kts
-          plugins { id("com.android.application"); id("kotlin-android"); id("dev.flutter.flutter-gradle-plugin") }
-          android {
-            namespace = "com.example.rabahdj_local_app"
-            compileSdk = 36
-            defaultConfig { applicationId = "com.example.rabahdj_local_app"; minSdk = 24; targetSdk = 34; versionCode = 1; versionName = "1.0.0" }
-          }
-          EOF
-
-      - name: 🎨 Inject Branding
-        run: |
-          sed -i 's/android:label=".*"/android:label="RabahDj App"/' android/app/src/main/AndroidManifest.xml
-          sudo apt-get install -y imagemagick
-          convert -size 512x512 xc:#1877F2 -fill white -font DejaVu-Sans-Bold -pointsize 300 -gravity center -draw "text 0,0 'R'" icon.png
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-          convert icon.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-
-      - name: ⚡ Build APK
-        run: |
-          flutter pub get
-          flutter build apk --release --no-tree-shake-icons
-
-      - name: 📤 Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: RabahDj-App
-          path: build/app/outputs/flutter-apk/app-release.apk
