@@ -28,16 +28,18 @@ jobs:
 
       - name: 🏗️ Create Fresh Flutter Project
         run: |
+          # تنظيف المجلد الحالي بأمان
           find . -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} +
+          # إنشاء المشروع مباشرة مع دعم خيار التحديث الرسمي
           flutter create . --org com.example --project-name rabahdj_local_app --platforms=android --overwrite
 
-         - name: 📝 Inject Target pubspec.yaml Dependencies
+      - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
           cat << 'EOF' > pubspec.yaml
           name: rabahdj_local_app
-          description: "A new Advanced Local Social Network."
+          description: "A new Flutter project."
           publish_to: 'none'
-          version: 1.1.0+2
+          version: 1.0.0+1
 
           environment:
             sdk: '>=3.0.0 <4.0.0'
@@ -52,9 +54,6 @@ jobs:
             http: ^1.2.0
             image_picker: ^1.1.2
             file_picker: ^8.1.4
-            sqflite: ^2.3.0        # لإدارة قاعدة البيانات المحلية على الهاتف
-            path: ^1.8.3           # للتعامل مع مسارات ملفات قاعدة البيانات
-            nsd: ^1.2.2            # للاكتشاف التلقائي للسيرفر عبر شبكة الـ WiFi
 
           dev_dependencies:
             flutter_test:
@@ -130,7 +129,6 @@ jobs:
                 myUsername = _nameController.text.trim();
               });
 
-              // إعداد الاتصال بالـ Socket.io عبر الـ IP المحلي
               socket = IO.io('http://$currentServerIp:4000', IO.OptionBuilder()
                 .setTransports(['websocket'])
                 .disableAutoConnect()
@@ -148,7 +146,6 @@ jobs:
                 setState(() => _isConnected = false);
               });
 
-              // استقبال الرسائل الفورية وتحديث الواجهة
               socket!.on('message', (data) {
                 if (mounted) {
                   setState(() {
@@ -157,7 +154,6 @@ jobs:
                 }
               });
 
-              // استقبال قائمة المستخدمين النشطين على الشبكة المحلية
               socket!.on('users_list', (data) {
                 if (mounted) {
                   setState(() {
@@ -202,7 +198,6 @@ jobs:
             }
           }
 
-          // شاشة التحكم في الاتصال وعرض إحصائيات الشبكة والمنشورات
           class HomeScreen extends StatelessWidget {
             final bool isConnected;
             final TextEditingController ipController;
@@ -241,3 +236,5 @@ jobs:
                       const SizedBox(height: 16),
                       const Divider(),
                       Expanded(
+                        child: connectedUsers.isEmpty
+                            ? const Center(child: Text('لا يوجد مستخدمين آخرين متصلين حالياً'))
