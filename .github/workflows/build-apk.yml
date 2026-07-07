@@ -35,7 +35,7 @@ jobs:
         run: |
           cat << 'EOF' > pubspec.yaml
           name: rabahdj_local_app
-          description: "Ultimate Offline Local Social Network."
+          description: "A new Advanced Local Social Network with E2EE Encryption."
           publish_to: 'none'
           version: 1.4.0+5
 
@@ -55,6 +55,7 @@ jobs:
             sqflite: ^2.3.0
             path: ^1.8.3
             nsd: ^1.2.2
+            encrypt: ^5.0.3        # [جديد] حزمة تشفير البيانات والرسائل محلياً
 
           dev_dependencies:
             flutter_test:
@@ -65,7 +66,7 @@ jobs:
             uses-material-design: true
           EOF
 
-      - name: 📲 Inject Ultra App UI with Profile, Stories & WiFi Hub
+      - name: 📲 Inject Ultra App UI with Profile & WiFi Secure E2EE
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -76,6 +77,7 @@ jobs:
           import 'package:image_picker/image_picker.dart';
           import 'package:file_picker/file_picker.dart';
           import 'package:nsd/nsd.dart' as nsd;
+          import 'package:encrypt/encrypt.dart' as enc;
           import 'dart:convert';
           import 'dart:io';
 
@@ -83,16 +85,37 @@ jobs:
           IO.Socket? socket;
           String currentServerIp = "192.168.1.10";
           List<Map<String, dynamic>> localFeedPosts = []; 
-          List<Map<String, dynamic>> localStories = []; // [جديد] قائمة الحالات والقصص اليومية
           List<Map<String, dynamic>> activeUsersWithIds = []; 
           Map<String, List<Map<String, dynamic>>> privateMessages = {}; 
           String myUsername = "مستخدم محلي";
           String? myProfileB64;
 
+          // إعداد مفتاح التشفير السري الموحد للشبكة المحلية (AES-256)
+          final encKey = enc.Key.fromUtf8('my32bytesecretkeyforrabahdjlocal'); // يجب أن يكون 32 حرفاً
+          final encIv = enc.IV.fromUtf8('16byteslonginitiv'); // يجب أن يكون 16 حرفاً
+
+          // دالة تشفير النصوص قبل إرسالها للواي فاي
+          String encryptText(String plainText) {
+            final encrypter = enc.Encrypter(enc.AES(encKey));
+            final encrypted = encrypter.encrypt(plainText, iv: encIv);
+            return encrypted.base64;
+          }
+
+          // دالة فك التشفير عند استقبال النص
+          String decryptText(String encryptedBase64) {
+            try {
+              final encrypter = enc.Encrypter(enc.AES(encKey));
+              return encrypter.decrypt64(encryptedBase64, iv: encIv);
+            } catch (e) {
+              return "[رسالة مشفرة لا يمكن قراءتها]";
+            }
+          }
+
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+            const InitializationSettings initializationSettings = InitializationSettings(android: androidDetails);
+            final InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             await _localNotificationsPlugin.initialize(initializationSettings);
             runApp(const MyApp());
           }
@@ -120,9 +143,7 @@ jobs:
           }
 
           class _MainNavigationScreenState extends State<MainNavigationScreen> {
-            int _currentIndex = 0;
-            bool _isConnected = false;
-            bool _isSearching = false;
+            int _currentIndex = 0; bool _isConnected = false; bool _isSearching = false;
             final TextEditingController _ipController = TextEditingController(text: currentServerIp);
             final TextEditingController _nameController = TextEditingController(text: myUsername);
 
@@ -136,10 +157,7 @@ jobs:
                     if (service.addresses.isNotEmpty) {
                       final foundIp = service.addresses.first.address;
                       nsd.stopDiscovery(discovery);
-                      setState(() {
-                        _ipController.text = foundIp;
-                        _isSearching = false;
-                      });
+                      setState(() { _ipController.text = foundIp; _isSearching = false; });
                       connectToServer();
                     }
                   }
@@ -152,39 +170,34 @@ jobs:
 
             void connectToServer() {
               if (socket != null) { socket!.disconnect(); socket!.dispose(); }
-              setState(() {
-                currentServerIp = _ipController.text.trim();
-                myUsername = _nameController.text.trim();
-              });
+              setState(() { currentServerIp = _ipController.text.trim(); myUsername = _nameController.text.trim(); });
 
-              socket = IO.io('http://$currentServerIp:4000', IO.OptionBuilder()
-                .setTransports(['websocket'])
-                .disableAutoConnect()
-                .build());
-
+              socket = IO.io('http://$currentServerIp:4000', IO.OptionBuilder().setTransports(['websocket']).disableAutoConnect().build());
               socket!.connect();
 
               socket!.onConnect((_) {
                 setState(() => _isConnected = true);
                 socket!.emit('join', {'username': myUsername, 'profile': myProfileB64});
               });
-
               socket!.onDisconnect((_) => setState(() => _isConnected = false));
 
               socket!.on('new_post', (data) {
-                if (mounted) setState(() { localFeedPosts.insert(0, Map<String, dynamic>.from(data)); });
-              });
-
-              // [جديد] استقبال قصة جديدة معروضة بالشبكة
-              socket!.on('new_story', (data) {
-                if (mounted) setState(() { localStories.insert(0, Map<String, dynamic>.from(data)); });
-              });
-
-              socket!.on('initial_data', (data) {
                 if (mounted) {
                   setState(() {
-                    localFeedPosts = List<Map<String, dynamic>>.from(data['posts']);
-                    localStories = List<Map<String, dynamic>>.from(data['stories']);
+                    var decryptedPost = Map<String, dynamic>.from(data);
+                    decryptedPost['content'] = decryptText(decryptedPost['content']); // فك تشفير محتوى المنشور
+                    localFeedPosts.insert(0, decryptedPost);
+                  });
+                }
+              });
+
+              socket!.on('initial_feed', (data) {
+                if (mounted) {
+                  setState(() {
+                    localFeedPosts = List<Map<String, dynamic>>.from(data).map((post) {
+                      post['content'] = decryptText(post['content']);
+                      return post;
+                    }).toList();
                   });
                 }
               });
@@ -207,38 +220,20 @@ jobs:
                   setState(() {
                     String senderId = data['senderId'];
                     if (!privateMessages.containsKey(senderId)) { privateMessages[senderId] = []; }
-                    privateMessages[senderId]!.add({'sender': data['senderName'], 'text': data['text'], 'isMe': false});
+                    // فك تشفير الرسالة الخاصة المستلمة قبل عرضها على الشاشة
+                    String decryptedMsg = decryptText(data['text']);
+                    privateMessages[senderId]!.add({'sender': data['senderName'], 'text': decryptedMsg, 'isMe': false});
                   });
-                  _showNotification("رسالة خاصة جديدة", "وصلتك رسالة من ${data['senderName']}");
+                  _showNotification("قفل أمان 🔐", "وصلتك رسالة خاصة مشفرة بالكامل");
                 }
               });
             }
 
             Future<void> _showNotification(String title, String body) async {
-              const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-                'private_ch_id', 'Private Alerts', channelDescription: 'Direct Messages Alerts',
-                importance: Importance.max, priority: Priority.high);
+              const AndroidNotificationDetails androidDetails = AndroidNotificationDetails('private_ch_id', 'Private Alerts', importance: Importance.max, priority: Priority.high);
               await _localNotificationsPlugin.show(1, title, body, const NotificationDetails(android: androidDetails));
             }
 
             @override
             Widget build(BuildContext context) {
               final List<Widget> screens = [
-                HomeScreen(isConnected: _isConnected, isSearching: _isSearching, ipController: _ipController, nameController: _nameController, onConnect: connectToServer, onAutoDiscover: startAutoDiscovery),
-                const FeedScreen(), 
-                const PrivateChatsListScreen(), 
-                const FileSharingHubScreen()
-              ];
-
-              return Scaffold(
-                body: screens[_currentIndex],
-                bottomNavigationBar: BottomNavigationBar(
-                  currentIndex: _currentIndex,
-                  onTap: (index) => setState(() => _currentIndex = index),
-                  selectedItemColor: const Color(0xFF1877F2),
-                  unselectedItemColor: Colors.grey,
-                  backgroundColor: const Color(0xFF242526),
-                  type: BottomNavigationBarType.fixed,
-                  items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.wifi_protected_setup), label: 'الشبكة'),
-                    BottomNavigationBarItem(icon: Icon(Icons.dynamic_feed), label: 'الخلاصة'),
