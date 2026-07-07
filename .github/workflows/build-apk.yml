@@ -64,8 +64,11 @@ jobs:
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             
-            // تم تمرير الإعدادات بأبسط طريقة متوافقة مع الإصدار الجديد لتجنب مشاكل الاسماء المسماة
-            await _localNotificationsPlugin.initialize(initializationSettings);
+            // التمرير الصحيح للإصدارات الحديثة v22+ عبر المعامل المسمى القياسي
+            await _localNotificationsPlugin.initialize(
+              initializationSettings,
+              onDidReceiveNotificationResponse: (NotificationResponse response) {},
+            );
             
             runApp(const MyApp());
           }
