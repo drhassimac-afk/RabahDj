@@ -28,11 +28,10 @@ jobs:
 
       - name: 🏗️ Create Fresh Flutter Project
         run: |
-          # تنظيف الملفات الظاهرة والمخفية بأمان دون لمس ملفات نظام الخادم
+          # تنظيف المجلد الحالي بأمان
           find . -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} +
-          # استخدام خيار --overwrite البديل والصحيح تقنياً لإنشاء المشروع في المجلد الحالي
+          # إنشاء المشروع مباشرة مع دعم خيار التحديث الرسمي
           flutter create . --org com.example --project-name rabahdj_local_app --platforms=android --overwrite
-
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
@@ -79,21 +78,19 @@ jobs:
           import 'dart:io';
 
           final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
-          late IO.Socket socket;
+          IO.Socket? socket;
           String currentServerIp = "192.168.1.10";
           List<Map<String, dynamic>> globalChatMessages = [];
+          List<String> connectedUsers = [];
           String myUsername = "مستخدم محلي";
           String? myProfileB64;
           String? myCoverB64;
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
-            
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-            
             await _localNotificationsPlugin.initialize(initializationSettings);
-            
             runApp(const MyApp());
           }
 
@@ -117,89 +114,127 @@ jobs:
 
           class _MainNavigationScreenState extends State<MainNavigationScreen> {
             int _currentIndex = 0;
-            final List<Widget> _screens = [const HomeScreen(), const ChatScreen(), const LocalShareScreen(), const ProfileScreen()];
+            bool _isConnected = false;
+            final TextEditingController _ipController = TextEditingController(text: currentServerIp);
+            final TextEditingController _nameController = TextEditingController(text: myUsername);
+
+            void connectToServer() {
+              if (socket != null) {
+                socket!.disconnect();
+                socket!.dispose();
+              }
+
+              setState(() {
+                currentServerIp = _ipController.text.trim();
+                myUsername = _nameController.text.trim();
+              });
+
+              socket = IO.io('http://$currentServerIp:4000', IO.OptionBuilder()
+                .setTransports(['websocket'])
+                .disableAutoConnect()
+                .build());
+
+              socket!.connect();
+
+              socket!.onConnect((_) {
+                setState(() => _isConnected = true);
+                socket!.emit('join', {'username': myUsername, 'profile': myProfileB64});
+                _showNotification("تم الاتصال", "أنت متصل الآن بشبكة RabahDj المحلية");
+              });
+
+              socket!.onDisconnect((_) {
+                setState(() => _isConnected = false);
+              });
+
+              socket!.on('message', (data) {
+                if (mounted) {
+                  setState(() {
+                    globalChatMessages.add(Map<String, dynamic>.from(data));
+                  });
+                }
+              });
+
+              socket!.on('users_list', (data) {
+                if (mounted) {
+                  setState(() {
+                    connectedUsers = List<String>.from(data);
+                  });
+                }
+              });
+            }
+
+            Future<void> _showNotification(String title, String body) async {
+              const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+                'local_ch_id', 'Local Alerts', channelDescription: 'WiFi Alerts',
+                importance: Importance.max, priority: Priority.high);
+              await _localNotificationsPlugin.show(0, title, body, const NotificationDetails(android: androidDetails));
+            }
+
             @override
             Widget build(BuildContext context) {
+              final List<Widget> screens = [
+                HomeScreen(isConnected: _isConnected, ipController: _ipController, nameController: _nameController, onConnect: connectToServer),
+                const ChatScreen(),
+                const LocalShareScreen(),
+                const ProfileScreen()
+              ];
+
               return Scaffold(
-                body: _screens[_currentIndex],
+                body: screens[_currentIndex],
                 bottomNavigationBar: BottomNavigationBar(
                   currentIndex: _currentIndex,
                   onTap: (index) => setState(() => _currentIndex = index),
                   selectedItemColor: const Color(0xFF1877F2),
                   unselectedItemColor: Colors.grey,
                   type: BottomNavigationBarType.fixed,
-                  items: const [BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'), BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'الدردشة'), BottomNavigationBarItem(icon: Icon(Icons.folder_shared), label: 'مشاركة'), BottomNavigationBarItem(icon: Icon(Icons.person), label: 'حسابي')],
+                  items: const [
+                    BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
+                    BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: 'الدردشة'),
+                    BottomNavigationBarItem(icon: Icon(Icons.folder_shared), label: 'مشاركة'),
+                    BottomNavigationBarItem(icon: Icon(Icons.person), label: 'حسابي')
+                  ],
                 ),
               );
             }
           }
 
-          class HomeScreen extends StatefulWidget {
-            const HomeScreen({super.key});
-            @override
-            State<HomeScreen> createState() => _HomeScreenState();
-          }
+          class HomeScreen extends StatelessWidget {
+            final bool isConnected;
+            final TextEditingController ipController;
+            final TextEditingController nameController;
+            final VoidCallback onConnect;
 
-          class _HomeScreenState extends State<HomeScreen> {
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(appBar: AppBar(title: const Text('RabahDj Local')), body: const Center(child: Text('الشبكة الرئيسية')));
-            }
-          }
+            const HomeScreen({super.key, required this.isConnected, required this.ipController, required this.nameController, required this.onConnect});
 
-          class ChatScreen extends StatelessWidget { const ChatScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('الدردشة'))); }
-          class LocalShareScreen extends StatelessWidget { const LocalShareScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('مشاركة الملفات'))); }
-
-          class ProfileScreen extends StatefulWidget { const ProfileScreen({super.key}); @override State<ProfileScreen> createState() => _ProfileScreenState(); }
-          class _ProfileScreenState extends State<ProfileScreen> {
-            final ImagePicker _picker = ImagePicker();
-            Future<void> _pickImage(bool isProfile) async {
-              final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
-              if (image != null) {
-                final bytes = await File(image.path).readAsBytes();
-                setState(() { isProfile ? myProfileB64 = base64Encode(bytes) : myCoverB64 = base64Encode(bytes); });
-              }
-            }
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                body: SingleChildScrollView(
-                  child: Column(children: [
-                    GestureDetector(onTap: () => _pickImage(false), child: Container(height: 180, color: Colors.grey[800], child: myCoverB64 != null ? Image.memory(base64Decode(myCoverB64!), fit: BoxFit.cover) : const Center(child: Icon(Icons.add_a_photo, size: 40, color: Colors.white54)))),
-                    const SizedBox(height: 10),
-                    GestureDetector(onTap: () => _pickImage(true), child: CircleAvatar(radius: 50, backgroundImage: myProfileB64 != null ? MemoryImage(base64Decode(myProfileB64!)) : null)),
-                  ]),
-                ),
-              );
-            }
-          }
-          EOF
-
-      - name: ⚙️ Adjust Android SDK Versions safely
-        run: |
-          # تعديل إصدار الـ SDK الآمن والذكي دون مساس بالبنية الأساسية لملف الجرادل المولد
-          sed -i 's/compileSdk = .*/compileSdk = 34/' android/app/build.gradle
-          sed -i 's/minSdk = .*/minSdk = 24/' android/app/build.gradle
-          sed -i 's/targetSdk = .*/targetSdk = 34/' android/app/build.gradle
-
-          # إضافة صلاحيات الإنترنت الضرورية للدردشة المحلية ومشاركة الملفات في الأندرويد
-          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"\/>' android/app/src/main/AndroidManifest.xml
-          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"\/>' android/app/src/main/AndroidManifest.xml
-
-      - name: 🎨 Inject Branding & App Name
-        run: |
-          # تغيير اسم التطبيق الظاهر للمستخدم على الهاتف
-          sed -i 's/android:label=".*"/android:label="RabahDj App"/' android/app/src/main/AndroidManifest.xml
-
-      - name: 📦 Get Flutter Packages
-        run: flutter pub get
-
-      - name: 🚀 Build Release APK
-        run: flutter build apk --release
-
-      - name: 📤 Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: RabahDj-Flutter-App
-          path: build/app/outputs/flutter-apk/app-release.apk
-
+                appBar: AppBar(title: const Text('RabahDj Local Network'), centerTitle: true),
+                body: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Card(
+                        color: isConnected ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                        child: ListTile(
+                          leading: Icon(isConnected ? Icons.wifi : Icons.wifi_off, color: isConnected ? Colors.green : Colors.red),
+                          title: Text(isConnected ? 'متصل بالسيرفر المحلي' : 'غير متصل بالشبكة'),
+                          subtitle: Text('المتصلين الآن: ${connectedUsers.length} مستخدم'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم المستخدم للشبكة', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
+                      TextField(controller: ipController, decoration: const InputDecoration(labelText: 'عنوان IP السيرفر المحلي', border: OutlineInputBorder())),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: const Color(0xFF1877F2)),
+                        onPressed: onConnect,
+                        icon: const Icon(Icons.sync, color: Colors.white),
+                        label: Text(isConnected ? 'إعادة الاتصال بالـ WiFi' : 'اتصال بالشبكة المحلية', style: const TextStyle(color: Colors.white)),
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      Expanded(
+                        child: connectedUsers.isEmpty
+                            ? const Center(child: Text('لا يوجد مستخدمين آخرين متصلين حالياً'))
