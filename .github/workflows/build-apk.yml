@@ -45,7 +45,6 @@ jobs:
           dependencies:
             flutter:
               sdk: flutter
-            flutter_local_notifications: ^22.0.1
             socket_io_client: ^3.1.1
             uuid: ^4.3.3
             video_player: ^2.9.2
@@ -69,7 +68,6 @@ jobs:
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
-          import 'package:flutter_local_notifications/flutter_local_notifications.dart';
           import 'package:socket_io_client/socket_io_client.dart' as IO;
           import 'package:uuid/uuid.dart';
           import 'package:http/http.dart' as http;
@@ -78,7 +76,6 @@ jobs:
           import 'dart:convert';
           import 'dart:io';
 
-          final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
           IO.Socket? socket;
           String currentServerIp = "192.168.1.10";
           List<Map<String, dynamic>> activeUsersList = []; 
@@ -88,12 +85,6 @@ jobs:
 
           void main() async {
             WidgetsFlutterBinding.ensureInitialized();
-            const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-            const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-            
-            await _localNotificationsPlugin.initialize(
-              initializationSettings: initializationSettings,
-            );
             runApp(const MyApp());
           }
 
