@@ -28,11 +28,10 @@ jobs:
 
       - name: 🏗️ Create Fresh Flutter Project
         run: |
-          rm -rf * .gitignore
-          flutter create clean_app --org com.example --project-name rabahdj_local_app --platforms=android
-          mv clean_app/* .
-          mv clean_app/.[!.]* .
-          rm -rf clean_app
+          # تنظيف المجلد الحالي بأمان دون حذف ملفات النظام الأساسية للـ Runner
+          find . -maxdepth 1 ! -name '.' ! -name '..' -exec rm -rf {} +
+          # إنشاء المشروع مباشرة في المجلد الحالي لتجنب مشاكل النقل والحذف
+          flutter create . --org com.example --project-name rabahdj_local_app --platforms=android --force
 
       - name: 📝 Inject Target pubspec.yaml Dependencies
         run: |
@@ -92,7 +91,6 @@ jobs:
             const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
             const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
             
-            // تمرير كلاس الإعدادات مباشرة كـ Positional Argument متوافق مع بنية السيرفر المحملة
             await _localNotificationsPlugin.initialize(initializationSettings);
             
             runApp(const MyApp());
@@ -167,6 +165,7 @@ jobs:
                 body: SingleChildScrollView(
                   child: Column(children: [
                     GestureDetector(onTap: () => _pickImage(false), child: Container(height: 180, color: Colors.grey[800], child: myCoverB64 != null ? Image.memory(base64Decode(myCoverB64!), fit: BoxFit.cover) : const Center(child: Icon(Icons.add_a_photo, size: 40, color: Colors.white54)))),
+                    const SizedBox(height: 10),
                     GestureDetector(onTap: () => _pickImage(true), child: CircleAvatar(radius: 50, backgroundImage: myProfileB64 != null ? MemoryImage(base64Decode(myProfileB64!)) : null)),
                   ]),
                 ),
@@ -175,32 +174,31 @@ jobs:
           }
           EOF
 
-      - name: 🛠️ Setup build.gradle.kts
+      - name: ⚙️ Adjust Android SDK Versions safely
         run: |
-          cat << 'EOF' > android/app/build.gradle.kts
-          plugins { id("com.android.application"); id("kotlin-android"); id("dev.flutter.flutter-gradle-plugin") }
-          android {
-            namespace = "com.example.rabahdj_local_app"
-            compileSdk = 36
-            defaultConfig { applicationId = "com.example.rabahdj_local_app"; minSdk = 24; targetSdk = 34; versionCode = 1; versionName = "1.0.0" }
-          }
-          EOF
+          # تعديل إصدار الـ SDK الآمن والذكي دون مساس بالبنية الأساسية لملف الجرادل المولد
+          sed -i 's/compileSdk = .*/compileSdk = 34/' android/app/build.gradle
+          sed -i 's/minSdk = .*/minSdk = 24/' android/app/build.gradle
+          sed -i 's/targetSdk = .*/targetSdk = 34/' android/app/build.gradle
 
-      - name: 🎨 Inject Branding
+          # إضافة صلاحيات الإنترنت الضرورية للدردشة المحلية ومشاركة الملفات في الأندرويد
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"\/>' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"\/>' android/app/src/main/AndroidManifest.xml
+
+      - name: 🎨 Inject Branding & App Name
         run: |
+          # تغيير اسم التطبيق الظاهر للمستخدم على الهاتف
           sed -i 's/android:label=".*"/android:label="RabahDj App"/' android/app/src/main/AndroidManifest.xml
-          sudo apt-get install -y imagemagick
-          convert -size 512x512 xc:#1877F2 -fill white -font DejaVu-Sans-Bold -pointsize 300 -gravity center -draw "text 0,0 'R'" icon.png
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-          convert icon.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
-      - name: ⚡ Build APK
-        run: |
-          flutter pub get
-          flutter build apk --release --no-tree-shake-icons
+      - name: 📦 Get Flutter Packages
+        run: flutter pub get
 
-      - name: 📤 Upload APK
+      - name: 🚀 Build Release APK
+        run: flutter build apk --release
+
+      - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RabahDj-App
+          name: RabahDj-Flutter-App
           path: build/app/outputs/flutter-apk/app-release.apk
+
