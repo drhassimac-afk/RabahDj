@@ -65,7 +65,7 @@ jobs:
             uses-material-design: true
           EOF
 
-          - name: 📲 Inject Ultra App UI with Profile & Advanced Private Chat
+      - name: 📲 Inject Ultra App UI with Profile & Advanced Private Chat
         run: |
           cat << 'EOF' > lib/main.dart
           import 'package:flutter/material.dart';
@@ -74,6 +74,7 @@ jobs:
           import 'package:uuid/uuid.dart';
           import 'package:http/http.dart' as http;
           import 'package:image_picker/image_picker.dart';
+          import 'package:nsd/nsd.dart' as nsd;
           import 'dart:convert';
           import 'dart:io';
 
@@ -81,8 +82,8 @@ jobs:
           IO.Socket? socket;
           String currentServerIp = "192.168.1.10";
           List<Map<String, dynamic>> localFeedPosts = []; 
-          List<Map<String, dynamic>> activeUsersWithIds = []; // قائمة المستخدمين مع الـ IDs الخاصة بهم للرسائل الخاصة
-          Map<String, List<Map<String, dynamic>>> privateMessages = {}; // حفظ الرسائل الخاصة لكل مستخدم
+          List<Map<String, dynamic>> activeUsersWithIds = []; 
+          Map<String, List<Map<String, dynamic>>> privateMessages = {}; 
           String myUsername = "مستخدم محلي";
           String? myProfileB64;
 
@@ -119,8 +120,38 @@ jobs:
           class _MainNavigationScreenState extends State<MainNavigationScreen> {
             int _currentIndex = 0;
             bool _isConnected = false;
+            bool _isSearching = false;
             final TextEditingController _ipController = TextEditingController(text: currentServerIp);
             final TextEditingController _nameController = TextEditingController(text: myUsername);
+
+            Future<void> startAutoDiscovery() async {
+              setState(() { _isSearching = true; });
+              try {
+                final discovery = await nsd.startDiscovery('_rabahdj._tcp');
+                discovery.addListener(() {
+                  if (discovery.services.isNotEmpty) {
+                    final service = discovery.services.first;
+                    if (service.addresses.isNotEmpty) {
+                      final foundIp = service.addresses.first.address;
+                      nsd.stopDiscovery(discovery);
+                      setState(() {
+                        _ipController.text = foundIp;
+                        _isSearching = false;
+                      });
+                      connectToServer();
+                    }
+                  }
+                });
+                
+                await Future.delayed(const Duration(seconds: 8));
+                nsd.stopDiscovery(discovery);
+                if (mounted && _isSearching) {
+                  setState(() { _isSearching = false; });
+                }
+              } catch (e) {
+                setState(() { _isSearching = false; });
+              }
+            }
 
             void connectToServer() {
               if (socket != null) { socket!.disconnect(); socket!.dispose(); }
@@ -148,6 +179,10 @@ jobs:
                 if (mounted) setState(() { localFeedPosts.insert(0, Map<String, dynamic>.from(data)); });
               });
 
+              socket!.on('initial_feed', (data) {
+                if (mounted) setState(() { localFeedPosts = List<Map<String, dynamic>>.from(data); });
+              });
+
               socket!.on('post_liked', (data) {
                 if (mounted) {
                   setState(() {
@@ -157,31 +192,23 @@ jobs:
                 }
               });
 
-              // استقبال قائمة المستخدمين النشطين (الاسم + مَعرف السوكت)
               socket!.on('users_list', (data) {
-                if (mounted) {
-                  setState(() {
-                    activeUsersWithIds = List<Map<String, dynamic>>.from(data);
-                  });
-                }
+                if (mounted) setState(() => activeUsersWithIds = List<Map<String, dynamic>>.from(data));
               });
 
-              // استقبال الرسائل الخاصة الموجهة لي شخصياً فوراً
               socket!.on('receive_private_message', (data) {
                 if (mounted) {
                   setState(() {
                     String senderId = data['senderId'];
                     String senderName = data['senderName'];
-                    if (!privateMessages.containsKey(senderId)) {
-                      privateMessages[senderId] = [];
-                    }
+                    if (!privateMessages.containsKey(senderId)) { privateMessages[senderId] = []; }
                     privateMessages[senderId]!.add({
                       'sender': senderName,
                       'text': data['text'],
                       'isMe': false
                     });
                   });
-                  _showNotification("رسالة خاصة جديدة", "وصلتك رسالة من $myUsername");
+                  _showNotification("رسالة خاصة جديدة", "وصلتك رسالة من ${data['senderName']}");
                 }
               });
             }
@@ -196,9 +223,9 @@ jobs:
             @override
             Widget build(BuildContext context) {
               final List<Widget> screens = [
-                HomeScreen(isConnected: _isConnected, ipController: _ipController, nameController: _nameController, onConnect: connectToServer),
+                HomeScreen(isConnected: _isConnected, isSearching: _isSearching, ipController: _ipController, nameController: _nameController, onConnect: connectToServer, onAutoDiscover: startAutoDiscovery),
                 const FeedScreen(), 
-                const PrivateChatsListScreen(), // شاشة قائمة المحادثات الثنائية
+                const PrivateChatsListScreen(), 
                 const ProfileScreen()
               ];
 
@@ -223,54 +250,3 @@ jobs:
           }
 
           class HomeScreen extends StatelessWidget {
-            final bool isConnected;
-            final TextEditingController ipController;
-            final TextEditingController nameController;
-            final VoidCallback onConnect;
-
-            const HomeScreen({super.key, required this.isConnected, required this.ipController, required this.nameController, required this.onConnect});
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('بوابة اتصال RabahDj'), backgroundColor: const Color(0xFF242526)),
-                body: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isConnected ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isConnected ? Colors.green : Colors.red)
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(isConnected ? Icons.gpp_good : Icons.gpp_bad, color: isConnected ? Colors.green : Colors.red, size: 30),
-                            const SizedBox(width: 12),
-                            Text(isConnected ? 'أنت متصل بالبث المحلي الحقيقي' : 'أنت غير متصل بالسيرفر المحلى', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم الشهرة بالشبكة', border: OutlineInputBorder())),
-                      const SizedBox(height: 12),
-                      TextField(controller: ipController, decoration: const InputDecoration(labelText: 'عنوان IP اللابتوب المستضيف', border: OutlineInputBorder())),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50), backgroundColor: const Color(0xFF1877F2)),
-                        onPressed: onConnect,
-                        child: const Text('تحديث والاتصال بالـ WiFi', style: TextStyle(color: Colors.white, fontSize: 16)),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-          }
-
-          // شاشة قائمة الأصدقاء المتصلين لبدء دردشة سرية
-          class PrivateChatsListScreen extends StatelessWidget {
-            const PrivateChatsListScreen({super.key});
-
