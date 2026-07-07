@@ -1,14 +1,16 @@
 {
-  "name": "rabahdj-server",
+  "name": "rabahdj-local-server",
   "version": "1.0.0",
-  "description": "سيرفر محلي لتطبيق RabahDj يعمل على شبكة واي فاي محلية بدون إنترنت",
+  "description": "Local Wi-Fi backend for RabahDj Social Network",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.19.2",
-    "socket.io": "^4.7.5",
-    "cors": "^2.8.5"
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.7.5"
   }
 }
+
