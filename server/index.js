@@ -6,8 +6,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Bonsoir = require('bonsoir');
-const { open } = require('sqlite');
-const sqlite3 = require('sqlite3');
+const low = require('lowdb');
+const FileSync = require('lowdb/adapters/FileSync');
 
 const app = express();
 app.use(cors());
@@ -33,39 +33,20 @@ const io = new Server(server, {
 });
 
 // الذاكرة المؤقتة للمستخدمين المتصلين حالياً بالواي فاي (تحفظ معرف السوكت واسم المستخدم)
-let activeUsers = new Map(); 
+let activeUsers = new Map();
 let db;
 
-// تهيئة قاعدة بيانات SQLite وإنشاء الجداول
-async function initDatabase() {
-    db = await open({
-        filename: path.join(__dirname, 'database.db'),
-        driver: sqlite3.Database
-    });
+// تهيئة قاعدة بيانات lowdb (ملف JSON محلي بدل sqlite)
+function initDatabase() {
+    const adapter = new FileSync(path.join(__dirname, 'database.json'));
+    db = low(adapter);
 
-    // جدول المنشورات العامة
-    await db.exec(`
-        CREATE TABLE IF NOT EXISTS posts (
-            id TEXT PRIMARY KEY,
-            author TEXT,
-            avatar TEXT,
-            content TEXT,
-            image TEXT,
-            likes INTEGER DEFAULT 0,
-            time TEXT
-        )
-    `);
+    // القيم الافتراضية عند أول تشغيل: جدول المنشورات وجدول الرسائل الخاصة
+    db.defaults({
+        posts: [],
+        private_messages: []
+    }).write();
 
-    // [جديد] جدول الرسائل الخاصة الثنائية
-    await db.exec(`
-        CREATE TABLE IF NOT EXISTS private_messages (
-            id TEXT PRIMARY KEY,
-            sender TEXT,
-            receiver TEXT,
-            text TEXT,
-            time TEXT
-        )
-    `);
     console.log('💾 قاعدة البيانات جاهزة ومحدثة بجداول الرسائل الخاصة!');
 }
 
@@ -73,7 +54,7 @@ async function initDatabase() {
 app.post('/upload', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'لم يتم اختيار أي ملف' });
     const fileUrl = `http://${req.hostname}:4000/files/${req.file.filename}`;
-    
+
     io.emit('message', {
         id: Date.now().toString(),
         sender: "النظام 🌐",
@@ -88,58 +69,70 @@ io.on('connection', async (socket) => {
     console.log(`جهاز جديد اتصل: ${socket.id}`);
 
     // انضمام مستخدم باسم محدد
-    socket.on('join', async (data) => {
+    socket.on('join', (data) => {
         activeUsers.set(socket.id, data.username);
         updateUsersList();
-        
-        // جلب المنشورات العامة المخزنة
+
+        // جلب المنشورات العامة المخزنة (الأحدث أولاً)
         try {
-            const savedPosts = await db.all('SELECT * FROM posts ORDER BY ROWID DESC');
+            const savedPosts = db.get('posts').slice().reverse().value();
             socket.emit('initial_feed', savedPosts);
         } catch (err) { console.error(err); }
     });
 
     // استقبال منشور عام وتوزيعه
-    socket.on('create_post', async (postData) => {
+    socket.on('create_post', (postData) => {
         try {
-            await db.run(
-                'INSERT INTO posts (id, author, avatar, content, image, likes, time) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [postData.id, postData.author, postData.avatar, postData.content, postData.image, postData.likes || 0, postData.time]
-            );
+            db.get('posts').push({
+                id: postData.id,
+                author: postData.author,
+                avatar: postData.avatar,
+                content: postData.content,
+                image: postData.image,
+                likes: postData.likes || 0,
+                time: postData.time
+            }).write();
             io.emit('new_post', postData);
         } catch (err) { console.error(err); }
     });
 
     // استقبال طلب إعجاب بمنشور وتحديث العداد
-    socket.on('like_post', async (data) => {
+    socket.on('like_post', (data) => {
         try {
-            await db.run('UPDATE posts SET likes = likes + 1 WHERE id = ?', [data.postId]);
-            const updatedPost = await db.get('SELECT likes FROM posts WHERE id = ?', [data.postId]);
-            if (updatedPost) io.emit('post_liked', { postId: data.postId, likesCount: updatedPost.likes });
+            const post = db.get('posts').find({ id: data.postId });
+            if (post.value()) {
+                post.update('likes', n => n + 1).write();
+                const updatedPost = post.value();
+                io.emit('post_liked', { postId: data.postId, likesCount: updatedPost.likes });
+            }
         } catch (err) { console.error(err); }
     });
 
-    // [جديد] طلب جلب أرشيف الرسائل الخاصة بين مستخدمين
-    socket.on('get_private_history', async (data) => {
+    // جلب أرشيف الرسائل الخاصة بين مستخدمين
+    socket.on('get_private_history', (data) => {
         try {
-            const history = await db.all(
-                `SELECT * FROM private_messages 
-                 WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?) 
-                 ORDER BY time ASC`,
-                [data.me, data.other, data.other, data.me]
-            );
+            const history = db.get('private_messages')
+                .filter(m =>
+                    (m.sender === data.me && m.receiver === data.other) ||
+                    (m.sender === data.other && m.receiver === data.me)
+                )
+                .sortBy('time')
+                .value();
             socket.emit('private_history', { other: data.other, messages: history });
         } catch (err) { console.error(err); }
     });
 
-    // [جديد] استقبال رسالة خاصة وتوجيهها للمستلم المستهدف بدقة
-    socket.on('send_private_message', async (msgData) => {
+    // استقبال رسالة خاصة وتوجيهها للمستلم المستهدف بدقة
+    socket.on('send_private_message', (msgData) => {
         try {
-            // حفظ الرسالة في SQLite بشكل دائم
-            await db.run(
-                'INSERT INTO private_messages (id, sender, receiver, text, time) VALUES (?, ?, ?, ?, ?)',
-                [msgData.id, msgData.sender, msgData.receiver, msgData.text, msgData.time]
-            );
+            // حفظ الرسالة في lowdb بشكل دائم
+            db.get('private_messages').push({
+                id: msgData.id,
+                sender: msgData.sender,
+                receiver: msgData.receiver,
+                text: msgData.text,
+                time: msgData.time
+            }).write();
 
             // البحث عن معرف الـ Socket الخاص بالمستلم لإرسالها له في الوقت الفعلي
             for (let [socketId, username] of activeUsers.entries()) {
@@ -172,7 +165,7 @@ async function startServerBroadcast() {
         const bonsoir = await Bonsoir.init();
         const service = bonsoir.createService({
             name: 'RabahDj Local Server',
-            type: 'rabahdj', 
+            type: 'rabahdj',
             protocol: 'tcp',
             port: 4000
         });
@@ -186,6 +179,6 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log(`=============================================`);
     console.log(`🚀 سيرفر RabahDj المحلي المتكامل يعمل بنجاح!`);
     console.log(`=============================================`);
-    await initDatabase();
+    initDatabase();
     startServerBroadcast();
 });
