@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import AdminScreen from '../screens/AdminScreen';
+=======
+>>>>>>> 011ab6cefd92a989072299c176a2bbc8bb7774ec
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Text } from "react-native";
@@ -37,12 +40,12 @@ export default function AppNavigator() {
           tabBarIcon: () => <Icon emoji="🏠" />,
         }}
       />
-      <Tab.Screen
-        name="Admin"
-        component={AdminScreen}
+<Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
         options={{
-          title: "لوحة التحكم",
-          tabBarIcon: () => <Icon emoji="⚙️" />,
+          title: "حسابي",
+          tabBarIcon: () => <Icon emoji="👤" />,
         }}
       />
     </Tab.Navigator>
