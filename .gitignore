@@ -1,0 +1,10 @@
+node_modules/
+.expo/
+dist/
+web-build/
+app/node_modules/
+app/.expo/
+app/android/
+app/ios/
+*.log
+.env
