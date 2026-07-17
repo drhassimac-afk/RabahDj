@@ -31,7 +31,7 @@ jobs:
       - name: 📦 Install Dependencies
         run: |
           cd app
-          npm ci
+          npm install --legacy-peer-deps
 
       - name: 🏗️ Generate Android Folder (Expo Prebuild)
         run: |
