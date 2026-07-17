@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
 
 // استيراد الشاشات الأساسية
-import FeedScreen from '../screens/feedScreen';
+import FeedScreen from '../screens/FeedScreen';
 import EntertainmentScreen from '../screens/EntertainmentScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AdminScreen from '../screens/AdminScreen';
