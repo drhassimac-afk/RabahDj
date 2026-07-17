@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    steps:
+    st,eps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
@@ -23,9 +23,10 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '26.3.1'  # <--- تطابق كربوني مع جهازك!
           cache: 'npm'
           cache-dependency-path: 'app/package-lock.json'
+
 
       - name: 📦 Install Dependencies
         run: |
