@@ -38,6 +38,13 @@ jobs:
           cd app
           npx expo prebuild --platform android
 
+      - name: 🛠️ Force JS Bundle Inside Debug APK
+        run: |
+          cd app/android/app
+          sed -i '/^react {/a\    bundleInDebug = true' build.gradle
+          echo "--- محتوى كتلة react بعد التعديل ---"
+          grep -A 5 "^react {" build.gradle
+
       - name: 🚀 Build Android Release APK
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
