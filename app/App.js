@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler'; // 👈 يجب أن يكون في السطر الأول تماماً
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
@@ -14,3 +15,4 @@ export default function App() {
     </SocketProvider>
   );
 }
+
