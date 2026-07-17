@@ -39,9 +39,11 @@ jobs:
           npx expo prebuild --platform android
 
       - name: 🚀 Build Android Release APK
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
         run: |
           cd app/android
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
