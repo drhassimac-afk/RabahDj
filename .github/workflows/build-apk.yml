@@ -41,7 +41,7 @@ jobs:
       - name: 🛠️ Force JS Bundle Inside Debug APK
         run: |
           cd app/android/app
-          sed -i '/^react {/a\    bundleInDebug = true' build.gradle
+          sed -i '/^react {/a\    debuggableVariants = []' build.gradle
           echo "--- محتوى كتلة react بعد التعديل ---"
           grep -A 5 "^react {" build.gradle
 
