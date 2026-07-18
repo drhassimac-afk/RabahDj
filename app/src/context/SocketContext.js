@@ -14,6 +14,8 @@ export function SocketProvider({ children }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [systemMessages, setSystemMessages] = useState([]);
   const [connectionError, setConnectionError] = useState(null);
+  const [walkieSettings, setWalkieSettings] = useState({ enabled: true, mutedUsers: [] });
+  const [walkieMessages, setWalkieMessages] = useState([]);
 
   const connect = async (ip, name) => {
     setConnectionError(null);
@@ -66,6 +68,14 @@ export function SocketProvider({ children }) {
 
     socket.on("disconnect", () => setConnected(false));
 
+    socket.on("walkie_settings_update", (settings) => {
+      setWalkieSettings(settings);
+    });
+
+    socket.on("walkie_audio_received", (data) => {
+      setWalkieMessages((prev) => [...prev.slice(-9), { ...data, id: Date.now().toString() }]);
+    });
+
     socketRef.current = socket;
   };
 
@@ -88,6 +98,18 @@ export function SocketProvider({ children }) {
     socketRef.current?.emit("newComment", { postId, text });
   };
 
+  const sendWalkieAudio = (audioBase64, duration) => {
+    socketRef.current?.emit("walkie_audio", { audioBase64, duration });
+  };
+
+  const toggleWalkieSystem = (enabled) => {
+    socketRef.current?.emit("admin_toggle_walkie", { enabled });
+  };
+
+  const muteWalkieUser = (username, muted) => {
+    socketRef.current?.emit("admin_mute_user", { username, muted });
+  };
+
   return (
     <SocketContext.Provider
       value={{
@@ -104,6 +126,11 @@ export function SocketProvider({ children }) {
         publishPost,
         toggleLike,
         addComment,
+        walkieSettings,
+        walkieMessages,
+        sendWalkieAudio,
+        toggleWalkieSystem,
+        muteWalkieUser,
       }}
     >
       {children}

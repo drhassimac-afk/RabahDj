@@ -13,6 +13,7 @@ import { useRabahSocket } from "../context/SocketContext";
 import PostCard from "../components/PostCard";
 import PostComposer from "../components/PostComposer";
 import colors from "../theme/colors";
+import WalkieTalkieButton from "../components/WalkieTalkieButton";
 
 // منشورات تجريبية رائعة تحتوي على صور لتشاهد جمال التصميم فوراً!
 const MOCK_POSTS = [
@@ -85,6 +86,7 @@ export default function FeedScreen() {
         }
         contentContainerStyle={{ paddingBottom: 20 }}
       />
+      <WalkieTalkieButton />
     </SafeAreaView>
   );
 }

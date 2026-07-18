@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Dimensions, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRabahSocket } from '../context/SocketContext';
 
 const { width } = Dimensions.get('window');
 
@@ -8,6 +9,7 @@ export default function AdminScreen() {
   const [secretActive, setSecretActive] = useState(false);
   const [tapCount, setTapCount] = useState(0);
   const [serverStatus, setServerStatus] = useState(true);
+  const { walkieSettings, onlineUsers, toggleWalkieSystem, muteWalkieUser } = useRabahSocket();
 
   const handleHeaderTap = () => {
     const newCount = tapCount + 1;
@@ -28,7 +30,7 @@ export default function AdminScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <TouchableOpacity activeOpacity={1} onPress={handleHeaderTap} style={styles.header}>
         <View style={styles.logoBadge}>
-          <Text>🔷</Text>
+          <Ionicons name="shield-checkmark" size={28} color="#00ffcc" />
         </View>
         <Text style={styles.headerTitle}>لوحة التحكم الإدارية</Text>
         <Text style={styles.headerSubtitle}>إدارة تطبيق RabahDj ومراقبة البيانات</Text>
@@ -37,7 +39,7 @@ export default function AdminScreen() {
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <View style={[styles.iconCircle, { backgroundColor: 'rgba(0, 255, 204, 0.1)' }]}>
-            <Text>🔷</Text>
+            <Ionicons name="people" size={22} color="#00ffcc" />
           </View>
           <Text style={styles.statNumber}>142</Text>
           <Text style={styles.statLabel}>إجمالي المستخدمين</Text>
@@ -45,7 +47,7 @@ export default function AdminScreen() {
 
         <View style={styles.statCard}>
           <View style={[styles.iconCircle, { backgroundColor: serverStatus ? 'rgba(52, 211, 153, 0.1)' : 'rgba(239, 68, 68, 0.1)' }]}>
-            <Text>🔷</Text>
+            <Ionicons name="pulse" size={22} color={serverStatus ? "#34d399" : "#ef4444"} />
           </View>
           <Text style={styles.statNumber}>{serverStatus ? "نشط" : "متوقف"}</Text>
           <Text style={styles.statLabel}>حالة السيرفر</Text>
@@ -57,7 +59,7 @@ export default function AdminScreen() {
 
         <View style={styles.switchRow}>
           <View style={styles.rowLeft}>
-            <Text>🔷</Text>
+            <Ionicons name="power-outline" size={20} color="#fff" />
             <Text style={styles.rowText}>حالة تشغيل التطبيق عمومیًا</Text>
           </View>
           <Switch
@@ -69,21 +71,61 @@ export default function AdminScreen() {
         </View>
 
         <TouchableOpacity style={styles.menuButton} onPress={() => Alert.alert("تنبيه", "جاري تحضير قائمة الإشعارات...")}>
-          <Text>🔷</Text>
+          <Ionicons name="notifications-outline" size={20} color="#fff" />
           <Text style={styles.menuButtonText}>إرسال تنبيه جماعي (Push Notification)</Text>
-          <Text>🔷</Text>
+          <Ionicons name="chevron-forward" size={16} color="#71717a" style={styles.arrowRight} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuButton} onPress={() => Alert.alert("قاعدة البيانات", "تصفح ملف database.json المحلي")}>
-          <Text>🔷</Text>
+          <Ionicons name="server-outline" size={20} color="#fff" />
           <Text style={styles.menuButtonText}>إدارة قاعدة البيانات الداخلية</Text>
-          <Text>🔷</Text>
+          <Ionicons name="chevron-forward" size={16} color="#71717a" style={styles.arrowRight} />
         </TouchableOpacity>
+
+
+        <Text style={styles.sectionTitle}>نظام التالكي ووكي 🎙️</Text>
+        <View style={styles.switchRow}>
+          <View style={styles.rowLeft}>
+            <Ionicons name="mic-outline" size={20} color="#fff" />
+            <Text style={styles.rowText}>تفعيل نظام الرسائل الصوتية</Text>
+          </View>
+          <Switch
+            value={walkieSettings?.enabled ?? true}
+            onValueChange={(val) => toggleWalkieSystem(val)}
+            trackColor={{ false: "#3f3f46", true: "#00ffcc" }}
+            thumbColor={"#ffffff"}
+          />
+        </View>
+
+        {onlineUsers && onlineUsers.length > 0 ? (
+          onlineUsers.map((user, index) => {
+            const uname = typeof user === "string" ? user : user.name;
+            const isMuted = walkieSettings?.mutedUsers?.includes(uname);
+            return (
+              <View style={styles.switchRow} key={index}>
+                <View style={styles.rowLeft}>
+                  <Ionicons name="person-circle-outline" size={20} color="#fff" />
+                  <Text style={styles.rowText}>{uname}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.menuButton, { paddingVertical: 6, paddingHorizontal: 12, marginBottom: 0 }, isMuted && styles.dangerButton]}
+                  onPress={() => muteWalkieUser(uname, !isMuted)}
+                >
+                  <Text style={[styles.menuButtonText, { fontSize: 12, marginLeft: 0 }]}>
+                    {isMuted ? "إلغاء الكتم" : "كتم"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })
+        ) : (
+          <Text style={styles.headerSubtitle}>لا يوجد مستخدمون متصلون حالياً</Text>
+        )}
 
         {secretActive && (
           <View style={styles.secretSection}>
             <View style={styles.secretHeader}>
-              <Text>🔷</Text>
+              <Ionicons name="key-outline" size={18} color="#f59e0b" />
               <Text style={styles.secretTitle}>أدوات المطور المتقدمة (مخفي)</Text>
             </View>
 
@@ -91,7 +133,7 @@ export default function AdminScreen() {
               style={[styles.menuButton, styles.dangerButton]}
               onPress={() => Alert.alert("إجراء حاسم", "جاري تصفير وإعادة تعيين السيرفر الفوري...")}
             >
-              <Text>🔷</Text>
+              <Ionicons name="refresh-circle-outline" size={20} color="#fff" />
               <Text style={styles.menuButtonText}>إعادة تعيين السيرفر بالكامل</Text>
             </TouchableOpacity>
 
@@ -99,7 +141,7 @@ export default function AdminScreen() {
               style={[styles.menuButton, styles.secretButton]}
               onPress={() => Alert.alert("مزامنة كربونية", "البيئة الحالية متصلة ومزامنة بالكامل مع Termux.")}
             >
-              <Text>🔷</Text>
+              <Ionicons name="terminal-outline" size={20} color="#fff" />
               <Text style={styles.menuButtonText}>استخراج سجلات الأخطاء (Logs)</Text>
             </TouchableOpacity>
           </View>

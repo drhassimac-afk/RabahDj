@@ -36,6 +36,7 @@ let db;
 
 // متغيرات بث راديو الـ DJ
 let currentBroadcaster = null;
+let walkieSettings = { enabled: true, mutedUsers: [] };
 
 function initDatabase() {
     const adapter = new FileSync(path.join(__dirname, 'database.json'));
@@ -232,7 +233,37 @@ io.on('connection', async (socket) => {
         if (currentBroadcaster) {
             socket.emit('radio_state_change', { active: true, broadcaster: currentBroadcaster.username });
         }
+            socket.emit('walkie_settings_update', walkieSettings);
     });
+
+// === نظام التالكي ووكي (رسائل صوتية فورية) ===
+  socket.on('walkie_audio', (data) => {
+    const username = activeUsers.get(socket.id);
+    if (!walkieSettings.enabled) return;
+    if (walkieSettings.mutedUsers.includes(username)) return;
+    socket.broadcast.emit('walkie_audio_received', {
+      sender: username,
+      audioBase64: data.audioBase64,
+      duration: data.duration,
+    });
+  });
+
+  socket.on('admin_toggle_walkie', (data) => {
+    walkieSettings.enabled = !!data.enabled;
+    io.emit('walkie_settings_update', walkieSettings);
+    console.log(`🎙️ نظام التالكي ووكي: ${walkieSettings.enabled ? 'مفعّل' : 'معطّل'}`);
+  });
+
+  socket.on('admin_mute_user', (data) => {
+    if (data.muted) {
+      if (!walkieSettings.mutedUsers.includes(data.username)) {
+        walkieSettings.mutedUsers.push(data.username);
+      }
+    } else {
+      walkieSettings.mutedUsers = walkieSettings.mutedUsers.filter(u => u !== data.username);
+    }
+    io.emit('walkie_settings_update', walkieSettings);
+  });
 
     socket.on('create_post', (postData) => {
         try {
