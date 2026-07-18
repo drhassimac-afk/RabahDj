@@ -1,240 +1,156 @@
-import React, { useState, useEffect, useContext } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  FlatList,
-  ScrollView,
-  Dimensions,
-  Alert
+import React, { useState, useEffect } from 'react';
+import { 
+  StyleSheet, Text, View, FlatList, TouchableOpacity, 
+  ScrollView, Image, Alert, Dimensions, ActivityIndicator 
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { SocketContext } from '../context/SocketContext';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { useRabahSocket } from '../context/SocketContext';
+import colors from '../theme/colors';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
-const SafeIcon = ({ library, name, size, color }) => {
-  try {
-    if (library === 'FontAwesome5') {
-      return <FontAwesome5 name={name} size={size} color={color} />;
-    }
-    return <Ionicons name={name} size={size} color={color} />;
-  } catch (e) {
-    return <View style={{ width: size, height: size, backgroundColor: 'transparent' }} />;
-  }
-};
-
 export default function EntertainmentScreen() {
-  const navigation = useNavigation();
-  const context = useContext(SocketContext) || {};
-  const socket = context.socket || null;
-  const isConnected = context.isConnected || false;
+  const { connected } = useRabahSocket();
+  const [activeTab, setActiveTab] = useState('movies'); // 'movies' أو 'games'
 
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [broadcasterName, setBroadcasterName] = useState('');
-  const [radioActive, setRadioActive] = useState(false);
-
-  const [movies] = useState([
-    { id: '1', title: 'سهرة الـ DJ الخاصة', duration: '1h 45m', category: 'موسيقى & حماس' },
-    { id: '2', title: 'تحدي البرمجة المحلّي', duration: '2h 10m', category: 'وثائقي' },
+  // بيانات الأفلام التجريبية (المرفوعة على السيرفر المحلي في مجلد public/movies)
+  const [movies, setMovies] = useState([
+    {
+      id: '1',
+      title: 'فيلم الأكشن والسرعة',
+      duration: '2h 10m',
+      category: 'أكشن / إثارة',
+      thumbnail: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500',
+      url: 'http://192.168.100.2:4000/public/movies/action.mp4'
+    },
+    {
+      id: '2',
+      title: 'رحلة في أعماق الطبيعة',
+      duration: '1h 45m',
+      category: 'وثائقي',
+      thumbnail: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=500',
+      url: 'http://192.168.100.2:4000/public/movies/nature.mp4'
+    }
   ]);
 
-  useEffect(() => {
-    if (!socket) return;
+  // قائمة الألعاب المحلية المتوفرة
+  const games = [
+    { id: 'g1', title: 'تحدي الأسئلة والذكاء', icon: 'help-circle-outline', players: 'لعبة جماعية' },
+    { id: 'g2', title: 'سرعة البديهة والتصويب', icon: 'thunderstorm-outline', players: 'لاعب ضد لاعب' }
+  ];
 
-    const handleRadioState = (data) => {
-      if (data) {
-        setRadioActive(!!data.active);
-        if (data.active) {
-          setBroadcasterName(data.broadcaster || '');
-          Alert.alert('🎙️ راديو حيّ', `الـ DJ ${data.broadcaster || ''} بدأ بثاً صوتياً مباشراً الآن!`);
-        } else {
-          setBroadcasterName('');
-          setIsListening(false);
-        }
-      }
-    };
-
-    socket.on('radio_state_change', handleRadioState);
-
-    return () => {
-      socket.off('radio_state_change', handleRadioState);
-    };
-  }, [socket]);
-
-  const toggleBroadcast = () => {
-    if (!isConnected) {
-      Alert.alert('خطأ', 'أنت غير متصل بالسيرفر المحلي حالياً!');
+  const handlePlayMovie = (movie) => {
+    if (!connected) {
+      Alert.alert('تنبيه', 'أنت غير متصل بالسيرفر المحلي حالياً. يرجى الاتصال من شاشة الدخول.');
       return;
     }
-
-    if (isBroadcasting) {
-      socket?.emit('stop_broadcast');
-      setIsBroadcasting(false);
-    } else {
-      socket?.emit('start_broadcast');
-      setIsBroadcasting(true);
-      Alert.alert('🎙️ ميكروفون مفتوح', 'صوتك يعبر عبر الواي فاي لكل الهواتف المتصلة الآن!');
-    }
+    Alert.alert('بدء البث', `جاري تشغيل: ${movie.title} من السيرفر المحلي...`);
+    // هنا يتم استدعاء مشغل الفيديو في التطبيق وتمرير رابط الـ movie.url
   };
 
-  const toggleListening = () => {
-    if (!radioActive && !isListening) {
-      Alert.alert('تنبيه', 'لا يوجد بث راديو نشط حالياً للاستماع إليه.');
-      return;
-    }
-    setIsListening(!isListening);
+  const handleStartGame = (game) => {
+    Alert.alert('العاب الواي فاي', `جاري تحضير غرفة اللعب لـ ${game.title}...`);
   };
 
   return (
-    <View style={styles.mainWrapper}>
-      <View style={styles.topHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation && navigation.goBack()}>
-          <SafeIcon library="Ionicons" name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitlePage}>مركز الترفيه</Text>
-        <View style={{ width: 40 }} />
+    <View style={styles.container}>
+      {/* البار العلوي */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>بوابة الترفيه المحلي</Text>
+        <View style={styles.statusBadge}>
+          <View style={[styles.statusDot, { backgroundColor: connected ? '#10b981' : '#ef4444' }]} />
+          <Text style={styles.statusText}>{connected ? 'متصل بالشبكة' : 'بدون اتصال'}</Text>
+        </View>
       </View>
 
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={styles.weatherCard}>
-          <View style={styles.weatherInfo}>
-            <SafeIcon library="Ionicons" name="partly-sunny" size={40} color="#f59e0b" />
-            <View style={styles.weatherTextContainer}>
-              <Text style={styles.weatherTemp}>28°C</Text>
-              <Text style={styles.weatherStatus}>صافي ومريح</Text>
-            </View>
-          </View>
-          <View style={styles.weatherHeader}>
-            <Text style={styles.weatherTitle}>طقس أولاد موسى المحلي 📍</Text>
-            <Text style={styles.weatherSub}>محدث عبر السيرفر</Text>
-          </View>
-        </View>
+      {/* أزرار التنقل بين السينما والألعاب */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'movies' && styles.activeTab]}
+          onPress={() => setActiveTab('movies')}
+        >
+          <Ionicons name="film-outline" size={20} color={activeTab === 'movies' ? '#fff' : '#64748b'} />
+          <Text style={[styles.tabText, activeTab === 'movies' && styles.activeTabText]}>سينما الواي فاي</Text>
+        </TouchableOpacity>
 
-        <View style={styles.radioSection}>
-          <Text style={styles.sectionTitleInside}>🎙️ راديو الـ DJ والاتصال المباشر</Text>
-          {radioActive && (
-            <View style={styles.activeBroadcastBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.activeBroadcastText}>بث مباشر حالي بواسطة: {broadcasterName}</Text>
-            </View>
-          )}
-          <View style={styles.radioButtonsContainer}>
-            <TouchableOpacity
-              style={[styles.radioButton, isBroadcasting ? styles.buttonActiveRed : styles.buttonPrimary]}
-              onPress={toggleBroadcast}
-            >
-              <SafeIcon library="FontAwesome5" name="microphone" size={18} color="#fff" />
-              <Text style={styles.radioBtnText}>{isBroadcasting ? 'إيقاف البث' : 'تحدث الآن'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.radioButton, isListening ? styles.buttonActiveGreen : styles.buttonSecondary]}
-              onPress={toggleListening}
-            >
-              <SafeIcon library="Ionicons" name={isListening ? "volume-high" : "volume-mute"} size={18} color="#fff" />
-              <Text style={styles.radioBtnText}>{isListening ? 'مستمع' : 'استمع للبث'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'games' && styles.activeTab]}
+          onPress={() => setActiveTab('games')}
+        >
+          <Ionicons name="game-controller-outline" size={20} color={activeTab === 'games' ? '#fff' : '#64748b'} />
+          <Text style={[styles.tabText, activeTab === 'games' && styles.activeTabText]}>ألعاب الشبكة</Text>
+        </TouchableOpacity>
+      </View>
 
-        <Text style={styles.sectionTitle}>🎮 مركز الترفيه والألعاب المشتركة</Text>
-        <View style={styles.gridContainer}>
-          <TouchableOpacity style={styles.gridCard} onPress={() => Alert.alert('العاب LAN', 'جاري تشغيل تحدي الألعاب الجماعية!')}>
-            <View style={[styles.iconCircle, { backgroundColor: '#3b82f6' }]}>
-              <SafeIcon library="Ionicons" name="logo-game-controller-b" size={26} color="#fff" />
-            </View>
-            <Text style={styles.cardTitle}>مكتبة الألعاب</Text>
-            <Text style={styles.cardDesc}>تحديات LAN فورية</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.gridCard} onPress={() => Alert.alert('سينما الواي فاي', 'تصفح الأفلام من السيرفر بسرعة البرق!')}>
-            <View style={[styles.iconCircle, { backgroundColor: '#a855f7' }]}>
-              <SafeIcon library="Ionicons" name="play-sharp" size={26} color="#fff" />
-            </View>
-            <Text style={styles.cardTitle}>سينما السيرفر</Text>
-            <Text style={styles.cardDesc}>أفلام وبث محلي</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.gridCard} onPress={() => Alert.alert('الريليز القصيرة', 'تصفح فيديوهات الأصدقاء!')}>
-            <View style={[styles.iconCircle, { backgroundColor: '#ec4899' }]}>
-              <SafeIcon library="Ionicons" name="videocam" size={26} color="#fff" />
-            </View>
-            <Text style={styles.cardTitle}>مقاطع Reels</Text>
-            <Text style={styles.cardDesc}>فيديوهات قصيرة</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.gridCard} onPress={() => Alert.alert('الدردشة العامة', 'غرفة دردشة جماعية فورية')}>
-            <View style={[styles.iconCircle, { backgroundColor: '#10b981' }]}>
-              <SafeIcon library="Ionicons" name="chatbubbles" size={26} color="#fff" />
-            </View>
-            <Text style={styles.cardTitle}>الدردشة الحية</Text>
-            <Text style={styles.cardDesc}>تواصل فوري</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.sectionTitle}>🎬 معروض الآن في السينما المحلية</Text>
-        <View style={styles.moviesListContainer}>
-          <FlatList
-            data={movies}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <View style={styles.movieCard}>
-                <View style={styles.movieIconArea}>
-                  <SafeIcon library="Ionicons" name="play-circle-outline" size={36} color="#a855f7" />
-                </View>
+      {/* المحتوى المتبدل */}
+      {activeTab === 'movies' ? (
+        <FlatList
+          data={movies}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.movieCard} onPress={() => handlePlayMovie(item)}>
+              <Image source={{ uri: item.thumbnail }} style={styles.movieImage} />
+              <View style={styles.movieDetails}>
                 <Text style={styles.movieTitle}>{item.title}</Text>
-                <Text style={styles.movieCat}>{item.category}</Text>
-                <TouchableOpacity style={styles.watchBtn} onPress={() => Alert.alert('بث سينمائي', `جاري تشغيل فيلم: ${item.title}`)}>
-                  <Text style={styles.watchBtnText}>تشغيل ⚡</Text>
-                </TouchableOpacity>
+                <View style={styles.movieMeta}>
+                  <Text style={styles.movieCategory}>{item.category}</Text>
+                  <Text style={styles.movieDuration}>⏱️ {item.duration}</Text>
+                </View>
               </View>
-            )}
-          />
-        </View>
-      </ScrollView>
+              <View style={styles.playButton}>
+                <Ionicons name="play" size={24} color="#fff" />
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      ) : (
+        <FlatList
+          data={games}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.gameCard} onPress={() => handleStartGame(item)}>
+              <View style={styles.gameIconBox}>
+                <Ionicons name={item.icon} size={32} color="#3b82f6" />
+              </View>
+              <View style={styles.gameInfo}>
+                <Text style={styles.gameTitle}>{item.title}</Text>
+                <Text style={styles.gamePlayers}>{item.players}</Text>
+              </View>
+              <Ionicons name="arrow-back-outline" size={20} color="#64748b" />
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  mainWrapper: { flex: 1, backgroundColor: '#0b0f19' },
-  topHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 50, paddingBottom: 12, paddingHorizontal: 16, backgroundColor: '#161c2a', borderBottomWidth: 1, borderColor: '#1e293b' },
-  backButton: { padding: 8, borderRadius: 8, backgroundColor: '#1f2937' },
-  headerTitlePage: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
-  container: { flex: 1, backgroundColor: '#0b0f19' },
-  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#3b82f6', marginHorizontal: 16, marginTop: 20, marginBottom: 10, textAlign: 'left' },
-  sectionTitleInside: { fontSize: 15, fontWeight: 'bold', color: '#3b82f6', marginBottom: 10, textAlign: 'left' },
-  weatherCard: { margin: 16, padding: 16, borderRadius: 16, backgroundColor: '#1d4ed8', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  weatherHeader: { alignItems: 'flex-end' },
-  weatherTitle: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  weatherSub: { color: '#bfdbfe', fontSize: 11, marginTop: 2 },
-  weatherInfo: { flexDirection: 'row', alignItems: 'center' },
-  weatherTextContainer: { marginLeft: 8, alignItems: 'flex-start' },
-  weatherTemp: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  weatherStatus: { color: '#fef08a', fontSize: 11, fontWeight: 'bold' },
-  radioSection: { backgroundColor: '#161c2a', marginHorizontal: 16, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1e293b' },
-  radioButtonsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  radioButton: { flex: 0.48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12 },
-  buttonPrimary: { backgroundColor: '#2563eb' },
-  buttonSecondary: { backgroundColor: '#334155' },
-  buttonActiveRed: { backgroundColor: '#dc2626' },
-  buttonActiveGreen: { backgroundColor: '#16a34a' },
-  radioBtnText: { color: '#fff', fontWeight: 'bold', marginLeft: 6, fontSize: 12 },
-  activeBroadcastBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 8, borderRadius: 10, marginBottom: 10 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444', marginRight: 6 },
-  activeBroadcastText: { color: '#fca5a5', fontSize: 12, fontWeight: 'bold' },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 16 },
-  gridCard: { width: (width - 44) / 2, backgroundColor: '#161c2a', borderRadius: 16, padding: 14, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#1e293b' },
-  iconCircle: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  cardTitle: { color: '#fff', fontWeight: 'bold', fontSize: 13, marginBottom: 2 },
-  cardDesc: { color: '#64748b', fontSize: 11 },
-  moviesListContainer: { height: 180, paddingHorizontal: 16 },
-  movieCard: { width: 140, backgroundColor: '#161c2a', borderRadius: 16, padding: 10, marginRight: 12, borderWidth: 1, borderColor: '#1e293b', alignItems: 'center', height: 160 },
-  movieIconArea: { width: '100%', height: 70, borderRadius: 12, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  movieTitle: { color: '#fff', fontWeight: 'bold', fontSize: 12, textAlign: 'center' },
-  movieCat: { color: '#94a3b8', fontSize: 10, marginTop: 2, marginBottom: 6 },
-  watchBtn: { backgroundColor: '#7c3aed', paddingVertical: 4, paddingHorizontal: 12, borderRadius: 8 },
-  watchBtnText: { color: '#fff', fontSize: 11, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#0b0f19', paddingTop: 50 },
+  header: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 20 },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  statusText: { color: '#94a3b8', fontSize: 12 },
+  tabsContainer: { flexDirection: 'row-reverse', paddingHorizontal: 20, marginBottom: 15 },
+  tab: { flex: 1, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: '#1e293b', marginHorizontal: 5 },
+  activeTab: { backgroundColor: '#3b82f6' },
+  tabText: { color: '#64748b', fontWeight: 'bold', marginRight: 8, fontSize: 14 },
+  activeTabText: { color: '#fff' },
+  listContent: { paddingHorizontal: 20, paddingBottom: 80 },
+  movieCard: { backgroundColor: '#1e293b', borderRadius: 16, marginBottom: 15, overflow: 'hidden', flexDirection: 'row-reverse', alignItems: 'center', padding: 10 },
+  movieImage: { width: 80, height: 80, borderRadius: 12 },
+  movieDetails: { flex: 1, marginRight: 15, alignItems: 'flex-end' },
+  movieTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff', marginBottom: 5 },
+  movieMeta: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', marginTop: 5 },
+  movieCategory: { color: '#3b82f6', fontSize: 12 },
+  movieDuration: { color: '#64748b', fontSize: 12 },
+  playButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#3b82f6', justifyContent: 'center', alignItems: 'center', marginLeft: 10 },
+  gameCard: { backgroundColor: '#1e293b', borderRadius: 14, padding: 15, marginBottom: 12, flexDirection: 'row-reverse', alignItems: 'center' },
+  gameIconBox: { width: 50, height: 50, borderRadius: 12, backgroundColor: 'rgba(59, 130, 246, 0.1)', justifyContent: 'center', alignItems: 'center' },
+  gameInfo: { flex: 1, marginRight: 15, alignItems: 'flex-end' },
+  gameTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
+  gamePlayers: { color: '#64748b', fontSize: 12, marginTop: 4 }
 });
