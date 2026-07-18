@@ -17,6 +17,7 @@ const Stack = createStackNavigator();
 function TabNavigator() {
   return (
     <Tab.Navigator
+      initialRouteName="الحائط" /* جعل الحائط هي الشاشة الافتراضية عند فتح التطبيق */
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: true,
@@ -46,7 +47,7 @@ function TabNavigator() {
           shadowRadius: 10,
         },
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+          let iconName = 'alert-circle-outline'; // أيقونة احتياطية افتراضية لتجنب الانهيار
 
           if (route.name === 'الحائط') {
             iconName = focused ? 'home' : 'home-outline';
@@ -64,9 +65,10 @@ function TabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="حسابي" component={ProfileScreen} />
-      <Tab.Screen name="الترفيه" component={EntertainmentScreen} />
+      {/* رتبنا الشاشات لتكون الحائط في اليمين أو الوسط حسب لغة الهاتف ولكن حددنا الافتراضي بالبث */}
       <Tab.Screen name="الحائط" component={FeedScreen} />
+      <Tab.Screen name="الترفيه" component={EntertainmentScreen} />
+      <Tab.Screen name="حسابي" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -80,13 +82,13 @@ export default function AppNavigator() {
       
       {/* شاشة الأدمن السرية (يتم الانتقال إليها من شاشة حسابي بالنقرات الخمس) */}
       <Stack.Screen
-          name="AdminScreen"
-          component={AdminScreen}
-          options={{
-            presentation: 'modal',
-            animationEnabled: true,
-          }}
-        />
+        name="AdminScreen"
+        component={AdminScreen}
+        options={{
+          presentation: 'modal',
+          animationEnabled: true,
+        }}
+      />
     </Stack.Navigator>
   );
 }
