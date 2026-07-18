@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const SocketContext = createContext(null);
+// تصدير السياق لاستخدامه بشكل مباشر إذا لزم الأمر في الشاشات القديمة
+export const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const socketRef = useRef(null);
@@ -80,7 +81,10 @@ export function SocketProvider({ children }) {
   };
 
   const disconnect = () => {
-    socketRef.current?.disconnect();
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+    }
     setConnected(false);
     setPosts([]);
     setOnlineUsers([]);
@@ -102,7 +106,7 @@ export function SocketProvider({ children }) {
     socketRef.current?.emit("walkie_audio", { audioBase64, duration });
   };
 
-  const toggleWalkieSystem = (enabled) => {
+  const toggleWalkSystem = (enabled) => {
     socketRef.current?.emit("admin_toggle_walkie", { enabled });
   };
 
@@ -114,6 +118,8 @@ export function SocketProvider({ children }) {
     <SocketContext.Provider
       value={{
         connected,
+        isConnected: connected, // اسم مستعار مدعوم لحماية الشاشات المختلفة من الانهيار
+        socket: socketRef.current, // تمرير كائن السوكيت الفعلي للأحداث المباشرة كالراديو وبث الـ DJ
         serverIp,
         userName,
         userId,
@@ -129,7 +135,7 @@ export function SocketProvider({ children }) {
         walkieSettings,
         walkieMessages,
         sendWalkieAudio,
-        toggleWalkieSystem,
+        toggleWalkieSystem: toggleWalkSystem,
         muteWalkieUser,
       }}
     >
