@@ -22,7 +22,7 @@ export default function PostCard({ post }) {
   const { userId, toggleLike, addComment } = useRabahSocket();
   const [commentText, setCommentText] = useState("");
   const [showComments, setShowComments] = useState(false);
-  const liked = post.likes.includes(userId);
+  const liked = Array.isArray(post?.likes) ? post.likes.includes(userId) : false;
 
   const handleSendComment = () => {
     if (!commentText.trim()) return;
