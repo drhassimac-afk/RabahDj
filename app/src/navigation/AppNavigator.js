@@ -82,6 +82,10 @@ export default function AppNavigator() {
       <Stack.Screen
           name="AdminScreen"
           component={AdminScreen}
+          options={{
+            presentation: 'modal',
+            animationEnabled: true,
+          }}
         />
     </Stack.Navigator>
   );
