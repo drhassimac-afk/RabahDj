@@ -1,160 +1,71 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-} from "react-native";
-import { useRabahSocket } from "../context/SocketContext";
-import colors from "../theme/colors";
+import React from 'react';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-function timeAgo(dateStr) {
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (diff < 60) return "الآن";
-  if (diff < 3600) return `منذ ${Math.floor(diff / 60)} د`;
-  if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} س`;
-  return `منذ ${Math.floor(diff / 86400)} يوم`;
-}
-
-export default function PostCard({ post }) {
-  const { userId, toggleLike, addComment } = useRabahSocket();
-  const [commentText, setCommentText] = useState("");
-  const [showComments, setShowComments] = useState(false);
+export default function PostCard({ post, userId = 'current_user_id' }) {
+  // 1. فحص آمن للـ likes لتجنب خطأ includes القاتل
   const liked = Array.isArray(post?.likes) ? post.likes.includes(userId) : false;
 
-  const handleSendComment = () => {
-    if (!commentText.trim()) return;
-    addComment(post.id, commentText.trim());
-    setCommentText("");
-  };
+  // 2. فحص آمن لعدد التعليقات (إذا كانت المصفوفة undefined)
+  const commentsCount = Array.isArray(post?.comments) ? post.comments.length : 0;
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <View style={[styles.avatar, { backgroundColor: post.avatarColor || colors.primary }]}>
-          <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase() || "?"}</Text>
-        </View>
-        <View style={styles.headerText}>
-          <Text style={styles.authorName}>{post.authorName}</Text>
-          <Text style={styles.time}>{timeAgo(post.createdAt)}</Text>
-        </View>
-      </View>
-
-      {post.text ? <Text style={styles.text}>{post.text}</Text> : null}
-      {post.image ? (
-        <Image source={{ uri: post.image }} style={styles.postImage} resizeMode="cover" />
-      ) : null}
-
-      <View style={styles.statsRow}>
-        <Text style={styles.statsText}>
-          {post.likes.length > 0 ? `👍 ${post.likes.length}` : ""}
-        </Text>
-        <Text style={styles.statsText}>
-          {post.comments.length > 0 ? `${post.comments.length} تعليق` : ""}
-        </Text>
-      </View>
-
-      <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => toggleLike(post.id)}>
-          <Text style={[styles.actionText, liked && styles.actionActive]}>
-            {liked ? "👍 أعجبني" : "🤍 إعجاب"}
-          </Text>
+      <Text style={styles.title}>{post?.title || post?.name || 'بدون عنوان'}</Text>
+      <Text style={styles.content}>{post?.content || post?.description || ''}</Text>
+      
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.actionButton}>
+          <Ionicons name={liked ? "heart" : "heart-outline"} size={20} color={liked ? "#ff3366" : "#a1a1aa"} />
+          <Text style={styles.actionText}>{post?.likes?.length || 0}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => setShowComments((s) => !s)}>
-          <Text style={styles.actionText}>💬 تعليق</Text>
+
+        <TouchableOpacity style={styles.actionButton}>
+          <Ionicons name="chatbubble-outline" size={20} color="#a1a1aa" />
+          <Text style={styles.actionText}>{commentsCount}</Text>
         </TouchableOpacity>
       </View>
-
-      {showComments && (
-        <View style={styles.commentsBox}>
-          {post.comments.map((c) => (
-            <View key={c.id} style={styles.commentRow}>
-              <Text style={styles.commentAuthor}>{c.authorName}</Text>
-              <Text style={styles.commentText}>{c.text}</Text>
-            </View>
-          ))}
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="اكتب تعليقاً..."
-              placeholderTextColor={colors.subtext}
-              value={commentText}
-              onChangeText={setCommentText}
-              textAlign="right"
-              onSubmitEditing={handleSendComment}
-            />
-            <TouchableOpacity onPress={handleSendComment}>
-              <Text style={styles.sendText}>إرسال</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    marginHorizontal: 12,
-    marginTop: 12,
-    padding: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    backgroundColor: '#141417',
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#202024',
   },
-  header: { flexDirection: "row-reverse", alignItems: "center", marginBottom: 10 },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 10,
+  title: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'left',
   },
-  avatarText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  headerText: { alignItems: "flex-end" },
-  authorName: { fontWeight: "700", fontSize: 15, color: colors.text },
-  time: { fontSize: 11, color: colors.subtext, marginTop: 2 },
-  text: { fontSize: 15, color: colors.text, textAlign: "right", lineHeight: 22, marginBottom: 8 },
-  postImage: { width: "100%", height: 220, borderRadius: 10, marginBottom: 8 },
-  statsRow: {
-    flexDirection: "row-reverse",
-    justifyContent: "space-between",
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  content: {
+    color: '#d4d4d8',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+    textAlign: 'left',
   },
-  statsText: { fontSize: 12, color: colors.subtext },
-  actionsRow: { flexDirection: "row-reverse", justifyContent: "space-around", paddingTop: 6 },
-  actionBtn: { paddingVertical: 8, paddingHorizontal: 20 },
-  actionText: { fontSize: 14, color: colors.subtext, fontWeight: "600" },
-  actionActive: { color: colors.primary },
-  commentsBox: { marginTop: 10, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
-  commentRow: {
-    backgroundColor: "#F0F2F5",
-    borderRadius: 10,
-    padding: 8,
-    marginBottom: 6,
-    alignItems: "flex-end",
+  footer: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#202024',
+    paddingTop: 10,
   },
-  commentAuthor: { fontSize: 12, fontWeight: "700", color: colors.text },
-  commentText: { fontSize: 13, color: colors.text, textAlign: "right" },
-  commentInputRow: { flexDirection: "row-reverse", alignItems: "center", marginTop: 4 },
-  commentInput: {
-    flex: 1,
-    backgroundColor: "#F0F2F5",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 13,
-    color: colors.text,
-    marginLeft: 8,
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
   },
-  sendText: { color: colors.primary, fontWeight: "700", fontSize: 13 },
+  actionText: {
+    color: '#a1a1aa',
+    fontSize: 14,
+    marginLeft: 6,
+  },
 });
