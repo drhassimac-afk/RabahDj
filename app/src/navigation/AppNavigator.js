@@ -79,14 +79,10 @@ export default function AppNavigator() {
       <Stack.Screen name="MainTabs" component={TabNavigator} />
       
       {/* شاشة الأدمن السرية (يتم الانتقال إليها من شاشة حسابي بالنقرات الخمس) */}
-      <Stack.Screen 
-        name="AdminScreen" 
-        component={AdminScreen} 
-        options={{
-          presentation: 'modal', // تفتح كأسلوب بطاقة من الأسفل للأعلى لمظهر أنيق جداً
-          animationEnabled: true,
-        }}
-      />
+      <Stack.Screen
+          name="AdminScreen"
+          component={AdminScreen}
+        />
     </Stack.Navigator>
   );
 }
