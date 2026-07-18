@@ -28,7 +28,7 @@ export default function AdminScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <TouchableOpacity activeOpacity={1} onPress={handleHeaderTap} style={styles.header}>
         <View style={styles.logoBadge}>
-          <Ionicons name="shield-checkmark" size={28} color="#00ffcc" />
+          <Text>🔷</Text>
         </View>
         <Text style={styles.headerTitle}>لوحة التحكم الإدارية</Text>
         <Text style={styles.headerSubtitle}>إدارة تطبيق RabahDj ومراقبة البيانات</Text>
@@ -37,7 +37,7 @@ export default function AdminScreen() {
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <View style={[styles.iconCircle, { backgroundColor: 'rgba(0, 255, 204, 0.1)' }]}>
-            <Ionicons name="people" size={22} color="#00ffcc" />
+            <Text>🔷</Text>
           </View>
           <Text style={styles.statNumber}>142</Text>
           <Text style={styles.statLabel}>إجمالي المستخدمين</Text>
@@ -45,7 +45,7 @@ export default function AdminScreen() {
 
         <View style={styles.statCard}>
           <View style={[styles.iconCircle, { backgroundColor: serverStatus ? 'rgba(52, 211, 153, 0.1)' : 'rgba(239, 68, 68, 0.1)' }]}>
-            <Ionicons name="pulse" size={22} color={serverStatus ? "#34d399" : "#ef4444"} />
+            <Text>🔷</Text>
           </View>
           <Text style={styles.statNumber}>{serverStatus ? "نشط" : "متوقف"}</Text>
           <Text style={styles.statLabel}>حالة السيرفر</Text>
@@ -57,7 +57,7 @@ export default function AdminScreen() {
 
         <View style={styles.switchRow}>
           <View style={styles.rowLeft}>
-            <Ionicons name="power-outline" size={20} color="#fff" />
+            <Text>🔷</Text>
             <Text style={styles.rowText}>حالة تشغيل التطبيق عمومیًا</Text>
           </View>
           <Switch
@@ -69,21 +69,21 @@ export default function AdminScreen() {
         </View>
 
         <TouchableOpacity style={styles.menuButton} onPress={() => Alert.alert("تنبيه", "جاري تحضير قائمة الإشعارات...")}>
-          <Ionicons name="notifications-outline" size={20} color="#fff" />
+          <Text>🔷</Text>
           <Text style={styles.menuButtonText}>إرسال تنبيه جماعي (Push Notification)</Text>
-          <Ionicons name="chevron-forward" size={16} color="#71717a" style={styles.arrowRight} />
+          <Text>🔷</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuButton} onPress={() => Alert.alert("قاعدة البيانات", "تصفح ملف database.json المحلي")}>
-          <Ionicons name="server-outline" size={20} color="#fff" />
+          <Text>🔷</Text>
           <Text style={styles.menuButtonText}>إدارة قاعدة البيانات الداخلية</Text>
-          <Ionicons name="chevron-forward" size={16} color="#71717a" style={styles.arrowRight} />
+          <Text>🔷</Text>
         </TouchableOpacity>
 
         {secretActive && (
           <View style={styles.secretSection}>
             <View style={styles.secretHeader}>
-              <Ionicons name="key-outline" size={18} color="#f59e0b" />
+              <Text>🔷</Text>
               <Text style={styles.secretTitle}>أدوات المطور المتقدمة (مخفي)</Text>
             </View>
 
@@ -91,7 +91,7 @@ export default function AdminScreen() {
               style={[styles.menuButton, styles.dangerButton]}
               onPress={() => Alert.alert("إجراء حاسم", "جاري تصفير وإعادة تعيين السيرفر الفوري...")}
             >
-              <Ionicons name="refresh-circle-outline" size={20} color="#fff" />
+              <Text>🔷</Text>
               <Text style={styles.menuButtonText}>إعادة تعيين السيرفر بالكامل</Text>
             </TouchableOpacity>
 
@@ -99,7 +99,7 @@ export default function AdminScreen() {
               style={[styles.menuButton, styles.secretButton]}
               onPress={() => Alert.alert("مزامنة كربونية", "البيئة الحالية متصلة ومزامنة بالكامل مع Termux.")}
             >
-              <Ionicons name="terminal-outline" size={20} color="#fff" />
+              <Text>🔷</Text>
               <Text style={styles.menuButtonText}>استخراج سجلات الأخطاء (Logs)</Text>
             </TouchableOpacity>
           </View>
