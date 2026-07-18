@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -10,13 +10,13 @@ import {
   Alert, 
   Dimensions 
 } from 'react-native';
-import { SocketContext } from '../context/SocketContext';
+import { useRabahSocket } from '../context/SocketContext';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 export default function AdminScreen({ navigation }) {
-  const { socket, isConnected } = useContext(SocketContext);
+  const { socket, isConnected } = useRabahSocket();
   
   // حقول الحماية والتحقق
   const [pinCode, setPinCode] = useState('');
