@@ -14,7 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRabahSocket } from "../context/SocketContext";
 import colors from "../theme/colors";
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
   const { connect, connected, connectionError } = useRabahSocket();
   const [name, setName] = useState("");
   const [ip, setIp] = useState("");
@@ -30,8 +30,14 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    if (connected) setLoading(false);
-  }, [connected]);
+    if (connected) {
+      setLoading(false);
+      // توجيه المستخدم تلقائياً للشاشة الرئيسية عند نجاح الاتصال بالسيرفر
+      if (navigation) {
+        navigation.replace("MainTabs");
+      }
+    }
+  }, [connected, navigation]);
 
   useEffect(() => {
     if (connectionError) setLoading(false);
@@ -71,7 +77,7 @@ export default function LoginScreen() {
           <Text style={styles.label}>عنوان IP الخاص بالسيرفر المحلي</Text>
           <TextInput
             style={styles.input}
-            placeholder="مثال: 192.168.1.10"
+            placeholder="مثال: 192.168.100.2"
             placeholderTextColor={colors.subtext}
             value={ip}
             onChangeText={setIp}
