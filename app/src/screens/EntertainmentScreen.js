@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, FlatList, TouchableOpacity, 
-  ScrollView, Image, Alert, Dimensions, ActivityIndicator 
+  Image, Alert, Dimensions 
 } from 'react-native';
 import { useRabahSocket } from '../context/SocketContext';
 import colors from '../theme/colors';
@@ -11,41 +11,36 @@ const { width } = Dimensions.get('window');
 
 export default function EntertainmentScreen() {
   const { connected } = useRabahSocket();
-  const [activeTab, setActiveTab] = useState('movies'); // 'movies' أو 'games'
+  const [activeTab, setActiveTab] = useState('movies');
 
-  // بيانات الأفلام التجريبية (المرفوعة على السيرفر المحلي في مجلد public/movies)
+  // 🌐 مصفوفة الأفلام والبث المباشر بروابط إنترنت مباشرة (توفير كامل للمساحة)
   const [movies, setMovies] = useState([
     {
-      id: '1',
-      title: 'فيلم الأكشن والسرعة',
-      duration: '2h 10m',
-      category: 'أكشن / إثارة',
-      thumbnail: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500',
-      url: 'http://192.168.100.2:4000/public/movies/action.mp4'
+      id: 'net_1',
+      title: 'بث مباشر: قناة الجزيرة الإخبارية',
+      duration: 'بث حي 24/7',
+      category: 'أخبار / مباشر',
+      thumbnail: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=500',
+      url: 'https://live-channels-edge.apple.com/us/news/aljazeera/index.m3u8' // رابط IPTV / M3U8 كمثال للبث الحي
     },
     {
-      id: '2',
-      title: 'رحلة في أعماق الطبيعة',
-      duration: '1h 45m',
-      category: 'وثائقي',
-      thumbnail: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=500',
-      url: 'http://192.168.100.2:4000/public/movies/nature.mp4'
+      id: 'net_2',
+      title: 'فيلم وثائقي: أسرار الكون والفضاء',
+      duration: '1h 25m',
+      category: 'وثائقي / علمي',
+      thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500',
+      url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' // رابط مباشر من خوادم جوجل بدون تخزين محلي
     }
   ]);
 
-  // قائمة الألعاب المحلية المتوفرة
   const games = [
     { id: 'g1', title: 'تحدي الأسئلة والذكاء', icon: 'help-circle-outline', players: 'لعبة جماعية' },
     { id: 'g2', title: 'سرعة البديهة والتصويب', icon: 'thunderstorm-outline', players: 'لاعب ضد لاعب' }
   ];
 
   const handlePlayMovie = (movie) => {
-    if (!connected) {
-      Alert.alert('تنبيه', 'أنت غير متصل بالسيرفر المحلي حالياً. يرجى الاتصال من شاشة الدخول.');
-      return;
-    }
-    Alert.alert('بدء البث', `جاري تشغيل: ${movie.title} من السيرفر المحلي...`);
-    // هنا يتم استدعاء مشغل الفيديو في التطبيق وتمرير رابط الـ movie.url
+    Alert.alert('بدء البث السحابي', `جاري الاتصال بالرابط المباشر لتشغيل: ${movie.title}`);
+    // هنا يتم تمرير الـ movie.url المباشر إلى مشغل الفيديو (Video Player) الخاص بالتطبيق
   };
 
   const handleStartGame = (game) => {
@@ -56,21 +51,21 @@ export default function EntertainmentScreen() {
     <View style={styles.container}>
       {/* البار العلوي */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>بوابة الترفيه المحلي</Text>
+        <Text style={styles.headerTitle}>بوابة الترفيه الذكية</Text>
         <View style={styles.statusBadge}>
           <View style={[styles.statusDot, { backgroundColor: connected ? '#10b981' : '#ef4444' }]} />
-          <Text style={styles.statusText}>{connected ? 'متصل بالشبكة' : 'بدون اتصال'}</Text>
+          <Text style={styles.statusText}>{connected ? 'متصل بالسيرفر' : 'بدون اتصال'}</Text>
         </View>
       </View>
 
-      {/* أزرار التنقل بين السينما والألعاب */}
+      {/* التبويبات */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'movies' && styles.activeTab]}
           onPress={() => setActiveTab('movies')}
         >
           <Ionicons name="film-outline" size={20} color={activeTab === 'movies' ? '#fff' : '#64748b'} />
-          <Text style={[styles.tabText, activeTab === 'movies' && styles.activeTabText]}>سينما الواي فاي</Text>
+          <Text style={[styles.tabText, activeTab === 'movies' && styles.activeTabText]}>سينما الإنترنت المباشرة</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -82,7 +77,7 @@ export default function EntertainmentScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* المحتوى المتبدل */}
+      {/* قائمة العرض */}
       {activeTab === 'movies' ? (
         <FlatList
           data={movies}
@@ -95,7 +90,7 @@ export default function EntertainmentScreen() {
                 <Text style={styles.movieTitle}>{item.title}</Text>
                 <View style={styles.movieMeta}>
                   <Text style={styles.movieCategory}>{item.category}</Text>
-                  <Text style={styles.movieDuration}>⏱️ {item.duration}</Text>
+                  <Text style={styles.movieDuration}>🌐 {item.duration}</Text>
                 </View>
               </View>
               <View style={styles.playButton}>
