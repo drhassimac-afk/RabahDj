@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRabahSocket } from '../context/SocketContext';
 
@@ -15,6 +15,9 @@ export default function PostCard({ post }) {
     <View style={styles.card}>
       <Text style={styles.title}>{authorName}</Text>
       {bodyText ? <Text style={styles.content}>{bodyText}</Text> : null}
+      {post?.image ? (
+        <Image source={{ uri: post.image }} style={styles.postImage} resizeMode="cover" />
+      ) : null}
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.actionButton} onPress={() => toggleLike(post.id)}>
@@ -53,6 +56,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
     textAlign: 'right',
+  },
+  postImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: 10,
+    marginBottom: 12,
   },
   footer: {
     flexDirection: 'row',
