@@ -30,10 +30,10 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
+// activeUsers: socket.id -> { name, avatarColor }
 let activeUsers = new Map();
 let db;
 
-// متغيرات بث راديو الـ DJ
 let currentBroadcaster = null;
 let walkieSettings = { enabled: true, mutedUsers: [] };
 
@@ -47,14 +47,25 @@ function initDatabase() {
     console.log('💾 قاعدة البيانات جاهزة ومحدثة بجداول الرسائل الخاصة!');
 }
 
+function getOnlineUsersList() {
+    return Array.from(activeUsers.entries()).map(([id, u]) => ({
+        id,
+        name: u.name,
+        avatarColor: u.avatarColor,
+    }));
+}
+
+function broadcastOnlineUsers() {
+    io.emit('onlineUsers', getOnlineUsersList());
+}
+
 // مسار لرفع الملفات
 app.post('/upload', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'لم يتم اختيار أي ملف' });
     const fileUrl = `http://${req.hostname}:4000/files/${req.file.filename}`;
 
-    io.emit('message', {
+    io.emit('systemMessage', {
         id: Date.now().toString(),
-        sender: "النظام 🌐",
         text: `تمت مشاركة ملف جديد: ${req.file.originalname}\nرابط التحميل: ${fileUrl}`,
         time: new Date().toISOString()
     });
@@ -65,7 +76,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 app.get('/', (req, res) => {
     const postsCount = db.get('posts').size().value() || 0;
     const pmCount = db.get('private_messages').size().value() || 0;
-    const usersArray = Array.from(activeUsers.values());
+    const usersArray = getOnlineUsersList();
 
     res.send(`
     <!DOCTYPE html>
@@ -86,10 +97,7 @@ app.get('/', (req, res) => {
                 flex-direction: column;
                 align-items: center;
             }
-            .container {
-                max-width: 1000px;
-                width: 100%;
-            }
+            .container { max-width: 1000px; width: 100%; }
             header {
                 display: flex;
                 justify-content: space-between;
@@ -101,58 +109,18 @@ app.get('/', (req, res) => {
                 box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
             }
             header h1 { margin: 0; font-size: 24px; font-weight: 900; }
-            .badge {
-                background: #10b981;
-                color: #fff;
-                padding: 5px 15px;
-                border-radius: 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            .grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 20px;
-                margin-bottom: 20px;
-            }
-            .card {
-                background-color: #161c2a;
-                padding: 20px;
-                border-radius: 15px;
-                border: 1px solid #1e293b;
-                text-align: center;
-                transition: transform 0.3s ease;
-            }
-            .card:hover {
-                transform: translateY(-5px);
-            }
+            .badge { background: #10b981; color: #fff; padding: 5px 15px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 20px; }
+            .card { background-color: #161c2a; padding: 20px; border-radius: 15px; border: 1px solid #1e293b; text-align: center; transition: transform 0.3s ease; }
+            .card:hover { transform: translateY(-5px); }
             .card h3 { margin: 0 0 10px 0; color: #94a3b8; font-size: 16px; }
             .card p { margin: 0; font-size: 32px; font-weight: bold; color: #3b82f6; }
-            .section {
-                background-color: #161c2a;
-                padding: 20px;
-                border-radius: 15px;
-                border: 1px solid #1e293b;
-                margin-bottom: 20px;
-            }
+            .section { background-color: #161c2a; padding: 20px; border-radius: 15px; border: 1px solid #1e293b; margin-bottom: 20px; }
             .section h2 { margin-top: 0; font-size: 20px; border-bottom: 2px solid #1e293b; padding-bottom: 10px; color: #3b82f6;}
             ul { list-style: none; padding: 0; margin: 0; }
-            li {
-                padding: 12px;
-                border-bottom: 1px solid #1e293b;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
+            li { padding: 12px; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
             li:last-child { border-bottom: none; }
-            .user-dot {
-                width: 10px;
-                height: 10px;
-                background-color: #10b981;
-                border-radius: 50%;
-                display: inline-block;
-                margin-left: 10px;
-            }
+            .user-dot { width: 10px; height: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; margin-left: 10px; }
         </style>
         <script src="/socket.io/socket.io.js"></script>
     </head>
@@ -162,42 +130,30 @@ app.get('/', (req, res) => {
                 <h1>🎙️ لوحة تحكم RabahDj الخارقة</h1>
                 <span class="badge">نشط الآن 📡</span>
             </header>
-            
+
             <div class="grid">
-                <div class="card">
-                    <h3>المتصلون بالشبكة</h3>
-                    <p id="users-count">${usersArray.length}</p>
-                </div>
-                <div class="card">
-                    <h3>المنشورات في الحائط</h3>
-                    <p id="posts-count">${postsCount}</p>
-                </div>
-                <div class="card">
-                    <h3>الرسائل الخاصة المتبادلة</h3>
-                    <p>${pmCount}</p>
-                </div>
-                <div class="card">
-                    <h3>راديو البث الحي</h3>
-                    <p id="radio-status" style="font-size: 20px; margin-top: 10px; color: #ef4444;">مغلق 💤</p>
-                </div>
+                <div class="card"><h3>المتصلون بالشبكة</h3><p id="users-count">${usersArray.length}</p></div>
+                <div class="card"><h3>المنشورات في الحائط</h3><p id="posts-count">${postsCount}</p></div>
+                <div class="card"><h3>الرسائل الخاصة المتبادلة</h3><p>${pmCount}</p></div>
+                <div class="card"><h3>راديو البث الحي</h3><p id="radio-status" style="font-size: 20px; margin-top: 10px; color: #ef4444;">مغلق 💤</p></div>
             </div>
 
             <div class="section">
                 <h2>📱 المتصلون حالياً بالواي فاي:</h2>
                 <ul id="users-list">
-                    ${usersArray.map(u => `<li><span><span class="user-dot"></span>${u}</span> <span style="color:#94a3b8;">هاتف متصل</span></li>`).join('')}
+                    ${usersArray.map(u => `<li><span><span class="user-dot"></span>${u.name}</span> <span style="color:#94a3b8;">هاتف متصل</span></li>`).join('')}
                 </ul>
             </div>
         </div>
 
         <script>
             const socket = io();
-            socket.on('users_list', (users) => {
+            socket.on('onlineUsers', (users) => {
                 document.getElementById('users-count').innerText = users.length;
                 const list = document.getElementById('users-list');
-                list.innerHTML = users.map(u => '<li><span><span class="user-dot"></span>' + u + '</span> <span style="color:#94a3b8;">هاتف متصل</span></li>').join('');
+                list.innerHTML = users.map(u => '<li><span><span class="user-dot"></span>' + u.name + '</span> <span style="color:#94a3b8;">هاتف متصل</span></li>').join('');
             });
-            socket.on('new_post', () => {
+            socket.on('postAdded', () => {
                 const countEl = document.getElementById('posts-count');
                 countEl.innerText = parseInt(countEl.innerText) + 1;
             });
@@ -221,73 +177,115 @@ io.on('connection', async (socket) => {
     console.log(`جهاز جديد اتصل: ${socket.id}`);
 
     socket.on('join', (data) => {
-        activeUsers.set(socket.id, data.username);
-        updateUsersList();
+        activeUsers.set(socket.id, { name: data.name, avatarColor: data.avatarColor });
+
+        let savedPosts = [];
         try {
-            const savedPosts = db.get('posts').slice().reverse().value();
-            socket.emit('initial_feed', savedPosts);
+            savedPosts = db.get('posts').slice().reverse().value();
         } catch (err) { console.error(err); }
-        
-        // إبلاغ المستخدم الجديد بحالة الراديو الحالية
+
+        socket.emit('init', {
+            posts: savedPosts,
+            userId: socket.id,
+            onlineUsers: getOnlineUsersList(),
+        });
+
+        broadcastOnlineUsers();
+
         if (currentBroadcaster) {
             socket.emit('radio_state_change', { active: true, broadcaster: currentBroadcaster.username });
         }
-            socket.emit('walkie_settings_update', walkieSettings);
+        socket.emit('walkie_settings_update', walkieSettings);
     });
 
-// === نظام التالكي ووكي (رسائل صوتية فورية) ===
-  socket.on('walkie_audio', (data) => {
-    const username = activeUsers.get(socket.id);
-    if (!walkieSettings.enabled) return;
-    if (walkieSettings.mutedUsers.includes(username)) return;
-    socket.broadcast.emit('walkie_audio_received', {
-      sender: username,
-      audioBase64: data.audioBase64,
-      duration: data.duration,
-    });
-  });
-
-  socket.on('admin_toggle_walkie', (data) => {
-    walkieSettings.enabled = !!data.enabled;
-    io.emit('walkie_settings_update', walkieSettings);
-    console.log(`🎙️ نظام التالكي ووكي: ${walkieSettings.enabled ? 'مفعّل' : 'معطّل'}`);
-  });
-
-  socket.on('admin_mute_user', (data) => {
-    if (data.muted) {
-      if (!walkieSettings.mutedUsers.includes(data.username)) {
-        walkieSettings.mutedUsers.push(data.username);
-      }
-    } else {
-      walkieSettings.mutedUsers = walkieSettings.mutedUsers.filter(u => u !== data.username);
-    }
-    io.emit('walkie_settings_update', walkieSettings);
-  });
-
-    socket.on('create_post', (postData) => {
+    // === نشر منشور جديد ===
+    socket.on('newPost', (data) => {
         try {
-            db.get('posts').push({
-                id: postData.id,
-                author: postData.author,
-                avatar: postData.avatar,
-                content: postData.content,
-                image: postData.image,
-                likes: postData.likes || 0,
-                time: postData.time
-            }).write();
-            io.emit('new_post', postData);
+            const user = activeUsers.get(socket.id);
+            const post = {
+                id: Date.now().toString(),
+                author: {
+                    name: user?.name || 'مجهول',
+                    avatarColor: user?.avatarColor || '#1877F2',
+                },
+                authorName: user?.name || 'مجهول',
+                avatarColor: user?.avatarColor || '#1877F2',
+                text: data.text || '',
+                image: data.image || null,
+                likes: [],
+                comments: [],
+                createdAt: new Date().toISOString(),
+            };
+            db.get('posts').push(post).write();
+            io.emit('postAdded', post);
         } catch (err) { console.error(err); }
     });
 
-    socket.on('like_post', (data) => {
+    // === إعجاب/إلغاء إعجاب بمنشور ===
+    socket.on('toggleLike', (data) => {
         try {
-            const post = db.get('posts').find({ id: data.postId });
-            if (post.value()) {
-                post.update('likes', n => n + 1).write();
-                const updatedPost = post.value();
-                io.emit('post_liked', { postId: data.postId, likesCount: updatedPost.likes });
+            const postRef = db.get('posts').find({ id: data.postId });
+            const post = postRef.value();
+            if (!post) return;
+            const likes = post.likes || [];
+            const idx = likes.indexOf(socket.id);
+            if (idx === -1) {
+                likes.push(socket.id);
+            } else {
+                likes.splice(idx, 1);
             }
+            postRef.assign({ likes }).write();
+            io.emit('postUpdated', postRef.value());
         } catch (err) { console.error(err); }
+    });
+
+    // === إضافة تعليق ===
+    socket.on('newComment', (data) => {
+        try {
+            const user = activeUsers.get(socket.id);
+            const postRef = db.get('posts').find({ id: data.postId });
+            const post = postRef.value();
+            if (!post) return;
+            const comments = post.comments || [];
+            comments.push({
+                id: Date.now().toString(),
+                authorName: user?.name || 'مجهول',
+                text: data.text,
+                createdAt: new Date().toISOString(),
+            });
+            postRef.assign({ comments }).write();
+            io.emit('postUpdated', postRef.value());
+        } catch (err) { console.error(err); }
+    });
+
+    // === نظام التالكي ووكي (رسائل صوتية فورية) ===
+    socket.on('walkie_audio', (data) => {
+        const user = activeUsers.get(socket.id);
+        const username = user?.name;
+        if (!walkieSettings.enabled) return;
+        if (walkieSettings.mutedUsers.includes(username)) return;
+        socket.broadcast.emit('walkie_audio_received', {
+            sender: username,
+            audioBase64: data.audioBase64,
+            duration: data.duration,
+        });
+    });
+
+    socket.on('admin_toggle_walkie', (data) => {
+        walkieSettings.enabled = !!data.enabled;
+        io.emit('walkie_settings_update', walkieSettings);
+        console.log(`🎙️ نظام التالكي ووكي: ${walkieSettings.enabled ? 'مفعّل' : 'معطّل'}`);
+    });
+
+    socket.on('admin_mute_user', (data) => {
+        if (data.muted) {
+            if (!walkieSettings.mutedUsers.includes(data.username)) {
+                walkieSettings.mutedUsers.push(data.username);
+            }
+        } else {
+            walkieSettings.mutedUsers = walkieSettings.mutedUsers.filter(u => u !== data.username);
+        }
+        io.emit('walkie_settings_update', walkieSettings);
     });
 
     socket.on('get_private_history', (data) => {
@@ -313,8 +311,8 @@ io.on('connection', async (socket) => {
                 time: msgData.time
             }).write();
 
-            for (let [socketId, username] of activeUsers.entries()) {
-                if (username === msgData.receiver || username === msgData.sender) {
+            for (let [socketId, user] of activeUsers.entries()) {
+                if (user.name === msgData.receiver || user.name === msgData.sender) {
                     io.to(socketId).emit('new_private_message', msgData);
                 }
             }
@@ -323,14 +321,14 @@ io.on('connection', async (socket) => {
 
     // === منطق البث الصوتي لراديو الـ DJ ===
     socket.on('start_broadcast', () => {
-        const username = activeUsers.get(socket.id) || "الـ DJ رابح";
+        const user = activeUsers.get(socket.id);
+        const username = user?.name || "الـ DJ رابح";
         currentBroadcaster = { id: socket.id, username: username };
         io.emit('radio_state_change', { active: true, broadcaster: username });
         console.log(`🎙️ بدأت جلسة راديو حية بواسطة: ${username}`);
     });
 
     socket.on('audio_chunk', (chunk) => {
-        // إعادة إرسال حزم الصوت لكل الهواتف المتصلة باستثناء الـ DJ الذي يرسلها
         socket.broadcast.emit('audio_stream', chunk);
     });
 
@@ -343,14 +341,13 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('disconnect', () => {
-        const username = activeUsers.get(socket.id);
-        if (username) {
+        const user = activeUsers.get(socket.id);
+        if (user) {
             activeUsers.delete(socket.id);
-            updateUsersList();
-            console.log(`❌ ${username} غادر الشبكة`);
+            broadcastOnlineUsers();
+            console.log(`❌ ${user.name} غادر الشبكة`);
         }
 
-        // إنهاء البث التلقائي إذا قطع اتصال الـ DJ
         if (currentBroadcaster && currentBroadcaster.id === socket.id) {
             currentBroadcaster = null;
             io.emit('radio_state_change', { active: false });
@@ -358,11 +355,6 @@ io.on('connection', async (socket) => {
         }
     });
 });
-
-function updateUsersList() {
-    const usersArray = Array.from(activeUsers.values());
-    io.emit('users_list', usersArray);
-}
 
 function startServerBroadcast() {
     try {
