@@ -1,14 +1,15 @@
 import React from "react";
 import {
   View,
+  TouchableOpacity,
   Text,
   FlatList,
   StyleSheet,
   SafeAreaView,
   ScrollView,
   StatusBar,
-  Platform,
-} from "react-native";
+  Platform
+} from 'react-native';
 import { useRabahSocket } from "../context/SocketContext";
 import PostCard from "../components/PostCard";
 import PostComposer from "../components/PostComposer";
@@ -55,7 +56,7 @@ export default function FeedScreen({ navigation }) {
   const { posts, onlineUsers, connected } = useRabahSocket();
 
   // إذا كان السيرفر متصلاً نستخدم البيانات الحقيقية، وإلا نستخدم البيانات التجريبية لكي لا يظل التطبيق فارغاً!
-  const displayPosts = posts && posts.length > 0 ? posts : MOCK_POSTS;
+  const displayPosts = posts || [];
   const displayOnlineUsers = onlineUsers && onlineUsers.length > 0 ? onlineUsers : MOCK_ONLINE_USERS;
   const isConnected = connected || false;
 
