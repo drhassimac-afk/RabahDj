@@ -1,4 +1,3 @@
-cat > index.js << 'EOF'
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -386,4 +385,3 @@ server.listen(PORT, '0.0.0.0', () => {
     initDatabase();
     startServerBroadcast();
 });
-EOF
