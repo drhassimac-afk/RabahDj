@@ -9,8 +9,10 @@ import {
   Platform,
   ActivityIndicator,
   SafeAreaView,
+  Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { useRabahSocket } from "../context/SocketContext";
 import colors from "../theme/colors";
 
@@ -20,8 +22,22 @@ export default function LoginScreen({ navigation }) {
   const [ip, setIp] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [pin, setPin] = useState("");
+  const [isPinVerified, setIsPinVerified] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [storedPin, setStoredPin] = useState("");
+
   useEffect(() => {
     (async () => {
+      const securePin = await SecureStore.getItemAsync("rabahdj_secure_pin");
+      if (securePin) {
+        setIsRegistered(true);
+        setStoredPin(securePin);
+      } else {
+        setIsRegistered(false);
+        setIsPinVerified(true);
+      }
+
       const lastIp = await AsyncStorage.getItem("rabahdj_last_ip");
       const lastName = await AsyncStorage.getItem("rabahdj_last_name");
       if (lastIp) setIp(lastIp);
@@ -32,7 +48,6 @@ export default function LoginScreen({ navigation }) {
   useEffect(() => {
     if (connected) {
       setLoading(false);
-      // توجيه المستخدم تلقائياً للشاشة الرئيسية عند نجاح الاتصال بالسيرفر
       if (navigation) {
         navigation.replace("MainTabs");
       }
@@ -42,6 +57,29 @@ export default function LoginScreen({ navigation }) {
   useEffect(() => {
     if (connectionError) setLoading(false);
   }, [connectionError]);
+
+  const handlePinAuth = async () => {
+    if (pin.length < 4) {
+      Alert.alert("تنبيه", "الرجاء إدخال رمز مكون من 4 أرقام");
+      return;
+    }
+
+    if (!isRegistered) {
+      await SecureStore.setItemAsync("rabahdj_secure_pin", pin);
+      Alert.alert("نجاح", "تم تعيين رمز الدخول بنجاح!");
+      setIsRegistered(true);
+      setStoredPin(pin);
+      setPin("");
+    } else {
+      if (pin === storedPin) {
+        setIsPinVerified(true);
+        setPin("");
+      } else {
+        Alert.alert("خطأ", "الرمز السري غير صحيح");
+        setPin("");
+      }
+    }
+  };
 
   const handleConnect = () => {
     if (!name.trim() || !ip.trim()) return;
@@ -63,46 +101,85 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.tagline}>شبكتك الاجتماعية المحلية — بدون إنترنت</Text>
         </View>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>اسمك</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="مثال: رابح"
-            placeholderTextColor={colors.subtext}
-            value={name}
-            onChangeText={setName}
-            textAlign="right"
-          />
-
-          <Text style={styles.label}>عنوان IP الخاص بالسيرفر المحلي</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="مثال: 192.168.100.2"
-            placeholderTextColor={colors.subtext}
-            value={ip}
-            onChangeText={setIp}
-            keyboardType="numbers-and-punctuation"
-            autoCapitalize="none"
-            textAlign="right"
-          />
-          <Text style={styles.hint}>
-            يظهر هذا العنوان في الطرفية عند تشغيل السيرفر على الجهاز المضيف، ويجب أن تكون كل الأجهزة على نفس شبكة الواي فاي.
-          </Text>
-
-          {connectionError ? <Text style={styles.error}>{connectionError}</Text> : null}
-
-          <TouchableOpacity
-            style={[styles.button, (!name.trim() || !ip.trim()) && styles.buttonDisabled]}
-            onPress={handleConnect}
-            disabled={!name.trim() || !ip.trim() || loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>اتصال</Text>
+        {!isPinVerified ? (
+          <View style={styles.form}>
+            <Text style={styles.pinTitle}>🔒 نظام الحماية المحلي</Text>
+            <Text style={styles.hintText}>الرجاء إدخال الرمز السري لفتح التطبيق</Text>
+            <TextInput
+              style={[styles.input, styles.pinInput]}
+              placeholder="X X X X"
+              placeholderTextColor={colors.subtext}
+              secureTextEntry
+              keyboardType="numeric"
+              maxLength={4}
+              value={pin}
+              onChangeText={setPin}
+            />
+            <TouchableOpacity style={styles.button} onPress={handlePinAuth}>
+              <Text style={styles.buttonText}>تأكيد الرمز</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.form}>
+            {!isRegistered && (
+              <View style={styles.registerNotice}>
+                <Text style={styles.registerNoticeText}>⚠️ يرجى تعيين رمز حماية أولاً لتأمين حسابك:</Text>
+                <TextInput
+                  style={[styles.input, { textAlign: 'center', marginBottom: 10 }]}
+                  placeholder="اختر رمز PIN مكون من 4 أرقام"
+                  secureTextEntry
+                  keyboardType="numeric"
+                  maxLength={4}
+                  value={pin}
+                  onChangeText={setPin}
+                />
+                <TouchableOpacity style={[styles.button, { marginTop: 5, backgroundColor: '#28a745' }]} onPress={handlePinAuth}>
+                  <Text style={styles.buttonText}>حفظ الرمز المختار</Text>
+                </TouchableOpacity>
+                <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 15 }} />
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
+
+            <Text style={styles.label}>اسمك</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="مثال: رابح"
+              placeholderTextColor={colors.subtext}
+              value={name}
+              onChangeText={setName}
+              textAlign="right"
+            />
+
+            <Text style={styles.label}>عنوان IP الخاص بالسيرفر المحلي</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="مثال: 192.168.100.2"
+              placeholderTextColor={colors.subtext}
+              value={ip}
+              onChangeText={setIp}
+              keyboardType="numbers-and-punctuation"
+              autoCapitalize="none"
+              textAlign="right"
+            />
+            <Text style={styles.hint}>
+              يظهر هذا العنوان في الطرفية عند تشغيل السيرفر على الجهاز المضيف، ويجب أن تكون كل الأجهزة على نفس شبكة الواي فاي.
+            </Text>
+
+            {connectionError ? <Text style={styles.error}>{connectionError}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.button, (!name.trim() || !ip.trim()) && styles.buttonDisabled]}
+              onPress={handleConnect}
+              disabled={!name.trim() || !ip.trim() || loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>اتصال</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -163,4 +240,11 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  pinTitle: { fontSize: 18, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 5 },
+  hintText: { fontSize: 13, color: colors.subtext, textAlign: "center", marginBottom: 20 },
+  pinInput: { fontSize: 22, textAlign: "center", letterSpacing: 8, paddingVertical: 10 },
+  registerNotice: { backgroundColor: "#FFF3CD", padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: "#FFEBAA" },
+  registerNoticeText: { color: "#856404", fontSize: 12, fontWeight: "bold", marginBottom: 8, textAlign: "right" }
 });
+
+
