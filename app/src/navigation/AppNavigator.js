@@ -3,8 +3,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
+import { useRabahSocket } from '../context/SocketContext';
 
-// استيراد الشاشات الأساسية
 import LoginScreen from '../screens/LoginScreen';
 import FeedScreen from '../screens/FeedScreen';
 import EntertainmentScreen from '../screens/EntertainmentScreen';
@@ -14,7 +14,6 @@ import AdminScreen from '../screens/AdminScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-// 1️⃣ ملاحة التبويبات السفلية (Bottom Tabs) بتصميم عصري عائم
 function TabNavigator() {
   return (
     <Tab.Navigator
@@ -73,25 +72,26 @@ function TabNavigator() {
   );
 }
 
-// 2️⃣ الملاحة الرئيسية (StackNavigator) تبدأ بشاشة الدخول أولاً كبوابة حماية
 export default function AppNavigator() {
+  const { connected } = useRabahSocket();
+
   return (
-    <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-      {/* شاشة الدخول الذكية هي أول ما يراه المستخدم */}
-      <Stack.Screen name="Login" component={LoginScreen} />
-
-      {/* التبويبات الأساسية يتم الانتقال إليها بعد نجاح الاتصال */}
-      <Stack.Screen name="MainTabs" component={TabNavigator} />
-
-      {/* شاشة الأدمن السرية */}
-      <Stack.Screen
-        name="AdminScreen"
-        component={AdminScreen}
-        options={{
-          presentation: 'modal',
-          animationEnabled: true,
-        }}
-      />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!connected ? (
+        <Stack.Screen name="Login" component={LoginScreen} />
+      ) : (
+        <>
+          <Stack.Screen name="MainTabs" component={TabNavigator} />
+          <Stack.Screen
+            name="AdminScreen"
+            component={AdminScreen}
+            options={{
+              presentation: 'modal',
+              animationEnabled: true,
+            }}
+          />
+        </>
+      )}
     </Stack.Navigator>
   );
 }
