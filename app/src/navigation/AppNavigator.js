@@ -10,6 +10,7 @@ import FeedScreen from '../screens/FeedScreen';
 import EntertainmentScreen from '../screens/EntertainmentScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AdminScreen from '../screens/AdminScreen';
+import ChatScreen from '../screens/ChatScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -89,6 +90,11 @@ export default function AppNavigator() {
               presentation: 'modal',
               animationEnabled: true,
             }}
+          />
+          <Stack.Screen
+            name="ChatScreen"
+            component={ChatScreen}
+            options={{ presentation: "card" }}
           />
         </>
       )}

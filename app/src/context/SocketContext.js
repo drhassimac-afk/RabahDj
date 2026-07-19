@@ -77,6 +77,19 @@ export function SocketProvider({ children }) {
       setWalkieMessages((prev) => [...prev.slice(-9), { ...data, id: Date.now().toString() }]);
     });
 
+    socket.on("private_history", ({ other, messages }) => {
+      setPrivateChats((prev) => ({ ...prev, [other]: messages }));
+    });
+
+    socket.on("new_private_message", (msgData) => {
+      const otherUser = msgData.sender === userName ? msgData.receiver : msgData.sender;
+      setPrivateChats((prev) => {
+        const list = prev[otherUser] || [];
+        if (list.some((m) => m.id === msgData.id)) return prev;
+        return { ...prev, [otherUser]: [...list, msgData] };
+      });
+    });
+
     socketRef.current = socket;
   };
 
@@ -114,6 +127,27 @@ export function SocketProvider({ children }) {
     socketRef.current?.emit("admin_mute_user", { username, muted });
   };
 
+  const [privateChats, setPrivateChats] = useState({});
+
+  const sendPrivateMessage = (receiver, text) => {
+    const msgData = {
+      id: Date.now().toString(),
+      sender: userName,
+      receiver,
+      text,
+      time: new Date().toISOString(),
+    };
+    socketRef.current?.emit("send_private_message", msgData);
+    setPrivateChats((prev) => {
+      const list = prev[receiver] || [];
+      return { ...prev, [receiver]: [...list, msgData] };
+    });
+  };
+
+  const loadPrivateHistory = (otherUser) => {
+    socketRef.current?.emit("get_private_history", { me: userName, other: otherUser });
+  };
+
   return (
     <SocketContext.Provider
       value={{
@@ -137,6 +171,9 @@ export function SocketProvider({ children }) {
         sendWalkieAudio,
         toggleWalkieSystem: toggleWalkSystem,
         muteWalkieUser,
+        privateChats,
+        sendPrivateMessage,
+        loadPrivateHistory,
       }}
     >
       {children}

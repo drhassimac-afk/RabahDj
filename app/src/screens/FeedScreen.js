@@ -51,7 +51,7 @@ const MOCK_ONLINE_USERS = [
   { id: "u4", name: "Yacine", avatarColor: "#0D5CD6" },
 ];
 
-export default function FeedScreen() {
+export default function FeedScreen({ navigation }) {
   const { posts, onlineUsers, connected } = useRabahSocket();
 
   // إذا كان السيرفر متصلاً نستخدم البيانات الحقيقية، وإلا نستخدم البيانات التجريبية لكي لا يظل التطبيق فارغاً!
@@ -77,7 +77,7 @@ export default function FeedScreen() {
         renderItem={({ item }) => <PostCard post={item} />}
         ListHeaderComponent={
           <>
-            <OnlineUsersBar users={displayOnlineUsers} />
+            <OnlineUsersBar users={displayOnlineUsers} navigation={navigation} />
             <PostComposer />
           </>
         }
@@ -91,7 +91,7 @@ export default function FeedScreen() {
   );
 }
 
-function OnlineUsersBar({ users }) {
+function OnlineUsersBar({ users, navigation }) {
   if (!users.length) return null;
   return (
     <ScrollView
@@ -104,7 +104,7 @@ function OnlineUsersBar({ users }) {
       {users.map((u) => {
         const avatarBg = u.avatarColor || colors.primary;
         return (
-          <View key={u.id} style={styles.onlineUser}>
+          <TouchableOpacity key={u.id} style={styles.onlineUser} onPress={() => navigation.navigate("ChatScreen", { otherUser: u.name })}>
             <View style={[styles.onlineAvatar, { backgroundColor: avatarBg }]}>
               <Text style={styles.onlineAvatarText}>{u.name?.[0]?.toUpperCase()}</Text>
               <View style={styles.onlineIndicator} />
@@ -112,7 +112,7 @@ function OnlineUsersBar({ users }) {
             <Text style={styles.onlineName} numberOfLines={1}>
               {u.name}
             </Text>
-          </View>
+          </TouchableOpacity>
         );
       })}
     </ScrollView>
