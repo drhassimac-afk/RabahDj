@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   StyleSheet, Text, View, FlatList, TouchableOpacity, 
-  Image, Alert, Dimensions 
+  Image, Dimensions 
 } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRabahSocket } from '../context/SocketContext';
-import colors from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
@@ -12,16 +13,17 @@ const { width } = Dimensions.get('window');
 export default function EntertainmentScreen() {
   const { connected } = useRabahSocket();
   const [activeTab, setActiveTab] = useState('movies');
+  const [selectedGameUrl, setSelectedGameUrl] = useState(null);
+  const [activeVideoUrl, setActiveVideoUrl] = useState(null);
 
-  // 🌐 مصفوفة الأفلام والبث المباشر بروابط إنترنت مباشرة (توفير كامل للمساحة)
-  const [movies, setMovies] = useState([
+  const [movies] = useState([
     {
       id: 'net_1',
       title: 'بث مباشر: قناة الجزيرة الإخبارية',
       duration: 'بث حي 24/7',
       category: 'أخبار / مباشر',
       thumbnail: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=500',
-      url: 'https://live-channels-edge.apple.com/us/news/aljazeera/index.m3u8' // رابط IPTV / M3U8 كمثال للبث الحي
+      url: 'https://live-channels-edge.apple.com/us/news/aljazeera/index.m3u8'
     },
     {
       id: 'net_2',
@@ -29,27 +31,59 @@ export default function EntertainmentScreen() {
       duration: '1h 25m',
       category: 'وثائقي / علمي',
       thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500',
-      url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' // رابط مباشر من خوادم جوجل بدون تخزين محلي
+      url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
     }
   ]);
 
   const games = [
-    { id: 'g1', title: 'تحدي الأسئلة والذكاء', icon: 'help-circle-outline', players: 'لعبة جماعية' },
-    { id: 'g2', title: 'سرعة البديهة والتصويب', icon: 'thunderstorm-outline', players: 'لاعب ضد لاعب' }
+    { id: 'g1', title: 'لعبة الشطرنج العالمية', icon: 'trophy-outline', players: 'لاعب ضد لاعب', url: 'https://lichess.org/embed' },
+    { id: 'g2', title: 'تحدي الأرقام والذكاء 2048', icon: 'help-circle-outline', players: 'لاعب واحد', url: 'https://play.2048.co/' }
   ];
 
+  const player = useVideoPlayer(activeVideoUrl, (playerInstance) => {
+    playerInstance.loop = false;
+    playerInstance.play();
+  });
+
   const handlePlayMovie = (movie) => {
-    Alert.alert('بدء البث السحابي', `جاري الاتصال بالرابط المباشر لتشغيل: ${movie.title}`);
-    // هنا يتم تمرير الـ movie.url المباشر إلى مشغل الفيديو (Video Player) الخاص بالتطبيق
+    setActiveVideoUrl(movie.url);
   };
 
-  const handleStartGame = (game) => {
-    Alert.alert('العاب الواي فاي', `جاري تحضير غرفة اللعب لـ ${game.title}...`);
-  };
+  if (activeVideoUrl) {
+    return (
+      <View style={styles.fullScreenContainer}>
+        <View style={styles.videoHeader}>
+          <TouchableOpacity style={styles.closeButton} onPress={() => { player.pause(); setActiveVideoUrl(null); }}>
+            <Ionicons name="close" size={24} color="#fff" />
+            <Text style={styles.closeText}>إغلاق المشغل</Text>
+          </TouchableOpacity>
+        </View>
+        <VideoView 
+          player={player} 
+          style={styles.videoPlayer} 
+          allowsFullscreen 
+          allowsPictureInPicture 
+        />
+      </View>
+    );
+  }
+
+  if (selectedGameUrl) {
+    return (
+      <View style={styles.fullScreenContainer}>
+        <View style={styles.videoHeader}>
+          <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedGameUrl(null)}>
+            <Ionicons name="close" size={24} color="#fff" />
+            <Text style={styles.closeText}>إغلاق اللعبة</Text>
+          </TouchableOpacity>
+        </View>
+        <WebView source={{ uri: selectedGameUrl }} style={{ flex: 1 }} javaScriptEnabled domStorageEnabled />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* البار العلوي */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>بوابة الترفيه الذكية</Text>
         <View style={styles.statusBadge}>
@@ -58,26 +92,17 @@ export default function EntertainmentScreen() {
         </View>
       </View>
 
-      {/* التبويبات */}
       <View style={styles.tabsContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'movies' && styles.activeTab]}
-          onPress={() => setActiveTab('movies')}
-        >
+        <TouchableOpacity style={[styles.tab, activeTab === 'movies' && styles.activeTab]} onPress={() => setActiveTab('movies')}>
           <Ionicons name="film-outline" size={20} color={activeTab === 'movies' ? '#fff' : '#64748b'} />
-          <Text style={[styles.tabText, activeTab === 'movies' && styles.activeTabText]}>سينما الإنترنت المباشرة</Text>
+          <Text style={[styles.tabText, activeTab === 'movies' && styles.activeTabText]}>سينما الإنترنت</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'games' && styles.activeTab]}
-          onPress={() => setActiveTab('games')}
-        >
+        <TouchableOpacity style={[styles.tab, activeTab === 'games' && styles.activeTab]} onPress={() => setActiveTab('games')}>
           <Ionicons name="game-controller-outline" size={20} color={activeTab === 'games' ? '#fff' : '#64748b'} />
-          <Text style={[styles.tabText, activeTab === 'games' && styles.activeTabText]}>ألعاب الشبكة</Text>
+          <Text style={[styles.tabText, activeTab === 'games' && styles.activeTabText]}>ألعاب سحابية</Text>
         </TouchableOpacity>
       </View>
 
-      {/* قائمة العرض */}
       {activeTab === 'movies' ? (
         <FlatList
           data={movies}
@@ -105,7 +130,7 @@ export default function EntertainmentScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.gameCard} onPress={() => handleStartGame(item)}>
+            <TouchableOpacity style={styles.gameCard} onPress={() => setSelectedGameUrl(item.url)}>
               <View style={styles.gameIconBox}>
                 <Ionicons name={item.icon} size={32} color="#3b82f6" />
               </View>
@@ -113,7 +138,7 @@ export default function EntertainmentScreen() {
                 <Text style={styles.gameTitle}>{item.title}</Text>
                 <Text style={styles.gamePlayers}>{item.players}</Text>
               </View>
-              <Ionicons name="arrow-back-outline" size={20} color="#64748b" />
+              <Ionicons name="chevron-back" size={24} color="#64748b" />
             </TouchableOpacity>
           )}
         />
@@ -147,5 +172,10 @@ const styles = StyleSheet.create({
   gameIconBox: { width: 50, height: 50, borderRadius: 12, backgroundColor: 'rgba(59, 130, 246, 0.1)', justifyContent: 'center', alignItems: 'center' },
   gameInfo: { flex: 1, marginRight: 15, alignItems: 'flex-end' },
   gameTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-  gamePlayers: { color: '#64748b', fontSize: 12, marginTop: 4 }
+  gamePlayers: { color: '#64748b', fontSize: 12, marginTop: 4 },
+  fullScreenContainer: { flex: 1, backgroundColor: '#000', paddingTop: 40 },
+  videoHeader: { height: 50, paddingHorizontal: 15, justifyContent: 'center', backgroundColor: '#111827' },
+  closeButton: { flexDirection: 'row', alignItems: 'center' },
+  closeText: { color: '#fff', marginLeft: 8, fontWeight: 'bold', fontSize: 14 },
+  videoPlayer: { width: '100%', height: 250, backgroundColor: '#000' }
 });
