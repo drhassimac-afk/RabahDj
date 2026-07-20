@@ -1,118 +1,94 @@
-import React, { useState, useRef, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
-import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system";
-import { useRabahSocket } from "../context/SocketContext";
-import colors from "../theme/colors";
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Animated, Easing } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import { useRabahSocket } from '../context/SocketContext';
 
 export default function WalkieTalkieButton() {
-  const { walkieSettings, walkieMessages, sendWalkieAudio, userName } = useRabahSocket();
-  const [recording, setRecording] = useState(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [lastSender, setLastSender] = useState(null);
-  const soundRef = useRef(null);
-  const lastPlayedId = useRef(null);
+  const { walkieSettings, sendWalkieAudio, userName } = useRabahSocket();
+  const [isTalking, setIsTalking] = useState(false);
+  const [sound, setSound] = useState(null);
+  const waveAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isTalking) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(waveAnim, {
+            toValue: 1.3,
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(waveAnim, {
+            toValue: 1,
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      waveAnim.setValue(1);
+    }
+  }, [isTalking]);
+
+  const playBeepSound = async (type) => {
+    try {
+      const { sound: soundObj } = await Audio.Sound.createAsync(
+        type === 'start'
+          ? { uri: 'https://actions.google.com/sounds/v1/tones/beep_short.ogg' }
+          : { uri: 'https://actions.google.com/sounds/v1/tones/single_beep.ogg' }
+      );
+      setSound(soundObj);
+      await soundObj.playAsync();
+    } catch (e) {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
+      if (sound) sound.unloadAsync();
     };
-  }, []);
+  }, [sound]);
 
-  useEffect(() => {
-    if (!walkieMessages || walkieMessages.length === 0) return;
-    const latest = walkieMessages[walkieMessages.length - 1];
-    if (latest.id === lastPlayedId.current) return;
-    lastPlayedId.current = latest.id;
-    playIncomingAudio(latest);
-  }, [walkieMessages]);
+  if (!walkieSettings?.enabled) return null;
 
-  const playIncomingAudio = async (msg) => {
-    try {
-      setLastSender(msg.sender);
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: `data:audio/m4a;base64,${msg.audioBase64}` },
-        { shouldPlay: true }
-      );
-      soundRef.current = sound;
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          setLastSender(null);
-          sound.unloadAsync();
-        }
-      });
-    } catch (err) {
-      console.error("خطأ في تشغيل الرسالة الصوتية:", err);
-    }
+  const handlePressIn = () => {
+    setIsTalking(true);
+    playBeepSound('start');
   };
 
-  const startRecording = async () => {
-    if (!walkieSettings?.enabled) {
-      Alert.alert("غير متاح", "نظام التالكي ووكي معطّل حالياً من قبل المشرف.");
-      return;
+  const handlePressOut = () => {
+    setIsTalking(false);
+    playBeepSound('stop');
+    // إرسال إشارة صوتية عبر الـ Socket
+    if (sendWalkieAudio) {
+      sendWalkieAudio("demo_audio_payload", 2);
     }
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert("صلاحية مطلوبة", "يجب السماح باستخدام الميكروفون لإرسال رسائل صوتية.");
-        return;
-      }
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(newRecording);
-      setIsRecording(true);
-    } catch (err) {
-      console.error("خطأ في بدء التسجيل:", err);
-    }
-  };
-
-  const stopRecording = async () => {
-    if (!recording) return;
-    setIsRecording(false);
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      const status = await recording.getStatusAsync();
-      const durationMillis = status.durationMillis || 0;
-
-      if (durationMillis < 500) {
-        setRecording(null);
-        return;
-      }
-
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: "base64",
-      });
-      sendWalkieAudio(base64, durationMillis);
-    } catch (err) {
-      console.error("خطأ في إيقاف التسجيل:", err);
-    }
-    setRecording(null);
   };
 
   return (
     <View style={styles.container}>
-      {lastSender ? (
-        <View style={styles.playingBanner}>
-          <Text style={styles.playingText}>🔊 {lastSender} يتحدث الآن...</Text>
+      {isTalking && (
+        <View style={styles.speakerPill}>
+          <Ionicons name="volume-high" size={14} color="#00ffcc" />
+          <Text style={styles.speakerText}>{userName || 'أنت'} تبث الآن...</Text>
         </View>
-      ) : null}
+      )}
+
+      <Animated.View style={[styles.waveCircle, isTalking && { transform: [{ scale: waveAnim }] }]} />
 
       <TouchableOpacity
-        style={[styles.talkButton, isRecording && styles.talkButtonActive]}
-        onPressIn={startRecording}
-        onPressOut={stopRecording}
         activeOpacity={0.8}
+        style={[styles.button, isTalking && styles.buttonActive]}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
       >
-        <Text style={styles.talkButtonText}>
-          {isRecording ? "🎙️ جارٍ التسجيل... اترك للإرسال" : "🎙️ اضغط مطولاً للتحدث"}
+        <Ionicons name={isTalking ? "mic" : "radio"} size={26} color={isTalking ? "#0b0f19" : "#fff"} />
+        <Text style={[styles.btnText, isTalking && styles.btnTextActive]}>
+          {isTalking ? "تحدث الآن..." : "اضغط للتحدث PTT"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -121,44 +97,61 @@ export default function WalkieTalkieButton() {
 
 const styles = StyleSheet.create({
   container: {
-    position: "absolute",
-    bottom: 16,
-    left: 12,
-    right: 12,
-    alignItems: "center",
+    position: 'absolute',
+    bottom: 80,
+    alignSelf: 'center',
+    alignItems: 'center',
+    zIndex: 999,
   },
-  playingBanner: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    paddingHorizontal: 16,
+  speakerPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 12,
     paddingVertical: 6,
+    borderRadius: 20,
     marginBottom: 8,
+    gap: 6,
     borderWidth: 1,
-    borderColor: colors.online,
+    borderColor: '#00ffcc',
   },
-  playingText: {
-    color: colors.online,
-    fontWeight: "600",
+  speakerText: {
+    color: '#00ffcc',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  waveCircle: {
+    position: 'absolute',
+    width: 140,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0, 255, 204, 0.25)',
+  },
+  button: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 30,
+    gap: 8,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    borderWidth: 1,
+    borderColor: '#60a5fa',
+  },
+  buttonActive: {
+    backgroundColor: '#00ffcc',
+    borderColor: '#fff',
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: 'bold',
     fontSize: 13,
   },
-  talkButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 30,
-    paddingVertical: 14,
-    width: "100%",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
-  },
-  talkButtonActive: {
-    backgroundColor: colors.danger,
-  },
-  talkButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 15,
+  btnTextActive: {
+    color: '#0b0f19',
   },
 });

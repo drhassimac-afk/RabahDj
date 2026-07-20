@@ -1,70 +1,66 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Image, StyleSheet } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { useRabahSocket } from "../context/SocketContext";
-import colors from "../theme/colors";
+import React, { useState } from 'react';
+import { StyleSheet, View, TextInput, TouchableOpacity, Text, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
+import { useRabahSocket } from '../context/SocketContext';
 
 export default function PostComposer() {
-  const { publishPost, userName } = useRabahSocket();
-  const [text, setText] = useState("");
+  const { publishPost, setPosts, userName } = useRabahSocket();
+  const [text, setText] = useState('');
   const [image, setImage] = useState(null);
 
   const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
+    let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
       quality: 0.5,
-      base64: true,
     });
-    if (!result.canceled && result.assets?.[0]) {
-      const asset = result.assets[0];
-      setImage(`data:image/jpeg;base64,${asset.base64}`);
-    }
+    if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  const handlePublish = () => {
+  const handleSend = () => {
     if (!text.trim() && !image) return;
-    publishPost(text.trim(), image);
-    setText("");
+    const newPost = {
+      id: Date.now().toString(),
+      author: userName || 'رابح',
+      text: text.trim(),
+      image: image,
+      likes: [],
+      comments: [],
+      createdAt: new Date().toISOString(),
+    };
+    setPosts((prev) => [newPost, ...prev]);
+    if (publishPost) publishPost(text.trim(), image);
+    setText('');
     setImage(null);
   };
 
   return (
     <View style={styles.card}>
-      <View style={styles.row}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{userName?.[0]?.toUpperCase() || "?"}</Text>
-        </View>
-        <TextInput
-          style={styles.input}
-          placeholder={`بماذا تفكر يا ${userName || ""}؟`}
-          placeholderTextColor={colors.subtext}
-          value={text}
-          onChangeText={setText}
-          multiline
-          textAlign="right"
-        />
-      </View>
-
-      {image ? (
-        <View style={styles.previewWrap}>
+      <TextInput 
+        style={styles.input} 
+        placeholder="بماذا تفكر يا رابح؟" 
+        placeholderTextColor="#64748b"
+        value={text} 
+        onChangeText={setText} 
+        multiline 
+      />
+      
+      {image && (
+        <View style={styles.imagePreviewContainer}>
           <Image source={{ uri: image }} style={styles.preview} />
           <TouchableOpacity style={styles.removeBtn} onPress={() => setImage(null)}>
-            <Text style={styles.removeText}>✕</Text>
+            <Ionicons name="close-circle" size={24} color="#ef4444" />
           </TouchableOpacity>
         </View>
-      ) : null}
+      )}
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.photoBtn} onPress={pickImage}>
-          <Text style={styles.photoText}>📷 صورة</Text>
+        <TouchableOpacity style={styles.iconBtn} onPress={pickImage}>
+          <Ionicons name="image" size={28} color="#3b82f6" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.publishBtn, !text.trim() && !image && styles.publishDisabled]}
-          onPress={handlePublish}
-          disabled={!text.trim() && !image}
-        >
+        
+        <TouchableOpacity style={styles.publishBtn} onPress={handleSend}>
           <Text style={styles.publishText}>نشر</Text>
         </TouchableOpacity>
       </View>
@@ -73,67 +69,13 @@ export default function PostComposer() {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    marginHorizontal: 12,
-    marginTop: 12,
-    padding: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  row: { flexDirection: "row-reverse", alignItems: "flex-start" },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 10,
-  },
-  avatarText: { color: "#fff", fontWeight: "bold" },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: colors.text,
-    paddingVertical: 8,
-    minHeight: 40,
-  },
-  previewWrap: { marginTop: 10, position: "relative" },
-  preview: { width: "100%", height: 180, borderRadius: 10 },
-  removeBtn: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderRadius: 14,
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  removeText: { color: "#fff", fontWeight: "bold" },
-  footer: {
-    flexDirection: "row-reverse",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 10,
-  },
-  photoBtn: { paddingVertical: 6, paddingHorizontal: 10 },
-  photoText: { color: colors.success, fontWeight: "600", fontSize: 14 },
-  publishBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 22,
-  },
-  publishDisabled: { opacity: 0.4 },
-  publishText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  card: { backgroundColor: '#141b2d', padding: 15, margin: 10, borderRadius: 20, borderWidth: 1, borderColor: '#1e293b' },
+  input: { color: '#ffffff', textAlign: 'right', fontSize: 16, marginBottom: 15 },
+  imagePreviewContainer: { position: 'relative', marginBottom: 15 },
+  preview: { width: '100%', height: 200, borderRadius: 15 },
+  removeBtn: { position: 'absolute', top: 5, right: 5 },
+  footer: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#1e293b', paddingTop: 15 },
+  iconBtn: { padding: 5 },
+  publishBtn: { backgroundColor: '#3b82f6', paddingHorizontal: 25, paddingVertical: 10, borderRadius: 20 },
+  publishText: { color: '#ffffff', fontWeight: 'bold' }
 });

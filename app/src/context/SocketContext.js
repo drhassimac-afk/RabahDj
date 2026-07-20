@@ -2,188 +2,135 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// تصدير السياق لاستخدامه بشكل مباشر إذا لزم الأمر في الشاشات القديمة
 export const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
-  const [serverIp, setServerIp] = useState(null);
-  const [userName, setUserName] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [posts, setPosts] = useState([]);
-  const [onlineUsers, setOnlineUsers] = useState([]);
-  const [systemMessages, setSystemMessages] = useState([]);
-  const [connectionError, setConnectionError] = useState(null);
-  const [walkieSettings, setWalkieSettings] = useState({ enabled: true, mutedUsers: [] });
-  const [walkieMessages, setWalkieMessages] = useState([]);
+  const [userName, setUserName] = useState("رابح");
+  const [posts, setPosts] = useState([
+    {
+      id: "demo-1",
+      author: "رابح",
+      text: "مرحباً بك! جرب كتابة تعليق الآن.",
+      likes: [],
+      comments: [{ id: "c1", author: "علي", text: "تطبيق رائع!" }],
+      createdAt: new Date().toISOString(),
+    }
+  ]);
+
+  useEffect(() => {
+    AsyncStorage.getItem("rabahdj_last_name").then(name => name && setUserName(name));
+  }, []);
 
   const connect = async (ip, name) => {
-    setConnectionError(null);
-    const avatarColor = randomColor();
-    const url = `http://${ip}:4000`;
+    setUserName(name);
+    AsyncStorage.setItem("rabahdj_last_name", name);
+    
+    if (socketRef.current) socketRef.current.disconnect();
 
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
-
-    const socket = io(url, {
-      transports: ["websocket"],
-      timeout: 6000,
-      reconnectionAttempts: 5,
-    });
+    const socket = io(`http://${ip}:4000`, { transports: ["websocket"], timeout: 5000 });
 
     socket.on("connect", () => {
       setConnected(true);
-      setServerIp(ip);
-      setUserName(name);
-      socket.emit("join", { name, avatarColor });
-      AsyncStorage.setItem("rabahdj_last_ip", ip);
-      AsyncStorage.setItem("rabahdj_last_name", name);
+      socket.emit("join", { name });
     });
 
-    socket.on("init", ({ posts, userId, onlineUsers }) => {
-      setPosts(posts);
-      setUserId(userId);
-      setOnlineUsers(onlineUsers);
+    socket.on("init", (data) => {
+      if (data && data.posts) setPosts(data.posts);
     });
 
     socket.on("postAdded", (post) => {
-      setPosts((prev) => [post, ...prev]);
-    });
-
-    socket.on("postUpdated", (updated) => {
-      setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    });
-
-    socket.on("onlineUsers", (list) => setOnlineUsers(list));
-
-    socket.on("systemMessage", (msg) => {
-      setSystemMessages((prev) => [...prev.slice(-20), msg]);
-    });
-
-    socket.on("connect_error", (err) => {
-      setConnectionError("تعذر الاتصال بالسيرفر. تأكد أن الجهازين على نفس شبكة الواي فاي وأن السيرفر يعمل.");
-      setConnected(false);
-    });
-
-    socket.on("disconnect", () => setConnected(false));
-
-    socket.on("walkie_settings_update", (settings) => {
-      setWalkieSettings(settings);
-    });
-
-    socket.on("walkie_audio_received", (data) => {
-      setWalkieMessages((prev) => [...prev.slice(-9), { ...data, id: Date.now().toString() }]);
-    });
-
-    socket.on("private_history", ({ other, messages }) => {
-      setPrivateChats((prev) => ({ ...prev, [other]: messages }));
-    });
-
-    socket.on("new_private_message", (msgData) => {
-      const otherUser = msgData.sender === userName ? msgData.receiver : msgData.sender;
-      setPrivateChats((prev) => {
-        const list = prev[otherUser] || [];
-        if (list.some((m) => m.id === msgData.id)) return prev;
-        return { ...prev, [otherUser]: [...list, msgData] };
-      });
+      setPosts((prev) => [post, ...prev.filter(p => p.id !== post.id)]);
     });
 
     socketRef.current = socket;
   };
 
-  const disconnect = () => {
-    if (socketRef.current) {
-      socketRef.current.removeAllListeners();
-      socketRef.current.disconnect();
-    }
-    setConnected(false);
-    setPosts([]);
-    setOnlineUsers([]);
-  };
+  const publishPost = (text) => {
+    if (!text.trim()) return;
 
-  const publishPost = (text, image) => {
-    socketRef.current?.emit("newPost", { text, image });
+    const newPost = {
+      id: Date.now().toString(),
+      author: userName || "رابح",
+      text: text.trim(),
+      likes: [],
+      comments: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    setPosts((prev) => [newPost, ...prev]);
+
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("newPost", { text: text.trim(), image: null });
+    }
   };
 
   const toggleLike = (postId) => {
-    socketRef.current?.emit("toggleLike", { postId });
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === postId) {
+          const likes = p.likes || [];
+          const isLiked = likes.includes(userName);
+          return {
+            ...p,
+            likes: isLiked ? likes.filter((u) => u !== userName) : [...likes, userName],
+          };
+        }
+        return p;
+      })
+    );
+
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("toggleLike", { postId });
+    }
   };
 
-  const addComment = (postId, text) => {
-    socketRef.current?.emit("newComment", { postId, text });
-  };
+  // دالة إضافة تعليق تفاعلي فوري
+  const addComment = (postId, commentText) => {
+    if (!commentText.trim()) return;
 
-  const sendWalkieAudio = (audioBase64, duration) => {
-    socketRef.current?.emit("walkie_audio", { audioBase64, duration });
-  };
-
-  const toggleWalkSystem = (enabled) => {
-    socketRef.current?.emit("admin_toggle_walkie", { enabled });
-  };
-
-  const muteWalkieUser = (username, muted) => {
-    socketRef.current?.emit("admin_mute_user", { username, muted });
-  };
-
-  const [privateChats, setPrivateChats] = useState({});
-
-  const sendPrivateMessage = (receiver, text) => {
-    const msgData = {
+    const newComment = {
       id: Date.now().toString(),
-      sender: userName,
-      receiver,
-      text,
-      time: new Date().toISOString(),
+      author: userName || "رابح",
+      text: commentText.trim(),
+      createdAt: new Date().toISOString(),
     };
-    socketRef.current?.emit("send_private_message", msgData);
-    setPrivateChats((prev) => {
-      const list = prev[receiver] || [];
-      return { ...prev, [receiver]: [...list, msgData] };
-    });
-  };
 
-  const loadPrivateHistory = (otherUser) => {
-    socketRef.current?.emit("get_private_history", { me: userName, other: otherUser });
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === postId) {
+          const currentComments = Array.isArray(p.comments) ? p.comments : [];
+          return {
+            ...p,
+            comments: [...currentComments, newComment],
+          };
+        }
+        return p;
+      })
+    );
+
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("addComment", { postId, comment: newComment });
+    }
   };
 
   return (
     <SocketContext.Provider
       value={{
         connected,
-        isConnected: connected, // اسم مستعار مدعوم لحماية الشاشات المختلفة من الانهيار
-        socket: socketRef.current, // تمرير كائن السوكيت الفعلي للأحداث المباشرة كالراديو وبث الـ DJ
-        serverIp,
         userName,
-        userId,
         posts,
-        onlineUsers,
-        systemMessages,
-        connectionError,
+        setPosts,
         connect,
-        disconnect,
         publishPost,
         toggleLike,
         addComment,
-        walkieSettings,
-        walkieMessages,
-        sendWalkieAudio,
-        toggleWalkieSystem: toggleWalkSystem,
-        muteWalkieUser,
-        privateChats,
-        sendPrivateMessage,
-        loadPrivateHistory,
       }}
     >
       {children}
     </SocketContext.Provider>
   );
-}
-
-function randomColor() {
-  const palette = ["#1877F2", "#E41E3F", "#42B72A", "#F7B928", "#8B5CF6", "#00A8CC"];
-  return palette[Math.floor(Math.random() * palette.length)];
 }
 
 export const useRabahSocket = () => useContext(SocketContext);

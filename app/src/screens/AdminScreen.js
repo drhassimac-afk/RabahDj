@@ -1,22 +1,31 @@
-import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Dimensions, Switch } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Dimensions, Switch, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRabahSocket } from '../context/SocketContext';
 import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
 
-export default function AdminScreen({ navigation }) {
+export default function AdminScreen({ route, navigation }) {
+  const isAdminAuthenticated = route?.params?.isAdminAuthenticated;
   const [secretActive, setSecretActive] = useState(false);
   const [tapCount, setTapCount] = useState(0);
+  const [newPin, setNewPin] = useState('');
+  const [showPinInput, setShowPinInput] = useState(false);
   const timerRef = useRef(null);
-  const { walkieSettings, onlineUsers, toggleWalkieSystem } = useRabahSocket();
+  const { walkieSettings, onlineUsers, toggleWalkieSystem, muteWalkieUser } = useRabahSocket();
+
+  useEffect(() => {
+    if (isAdminAuthenticated) {
+      setSecretActive(true);
+    }
+  }, [isAdminAuthenticated]);
 
   const handleHeaderTap = async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
 
     const newCount = tapCount + 1;
-    
+
     if (newCount >= 5) {
       setTapCount(0);
 
@@ -48,6 +57,19 @@ export default function AdminScreen({ navigation }) {
       }, 2000);
     }
   };
+
+  const handleChangePin = async () => {
+    if (newPin.length !== 4) {
+      Alert.alert("خطأ", "يجب أن يتكون رمز PIN من 4 أرقام exact.");
+      return;
+    }
+    await SecureStore.setItemAsync('user_pin', newPin);
+    Alert.alert("✅ تم بنجاح", "تم تغيير رمز PIN الإداري بنجاح!");
+    setNewPin('');
+    setShowPinInput(false);
+  };
+
+  const mutedUsers = walkieSettings?.mutedUsers || [];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -90,6 +112,64 @@ export default function AdminScreen({ navigation }) {
               thumbColor={walkieSettings?.enabled ? "#fff" : "#cbd5e1"}
             />
           </View>
+
+          <View style={styles.divider} />
+
+          <Text style={[styles.sectionTitle, { fontSize: 14, marginBottom: 10 }]}>🎙️ كتم أفراد الـ Walkie-Talkie</Text>
+
+          {(!onlineUsers || onlineUsers.length === 0) ? (
+            <Text style={styles.emptyText}>لا يوجد مستخدمون متصلون حالياً</Text>
+          ) : (
+            onlineUsers.map((user, index) => {
+              const username = typeof user === 'string' ? user : user.username || user.name || `User ${index}`;
+              const isMuted = mutedUsers.includes(username);
+
+              return (
+                <View key={index} style={styles.userRow}>
+                  <View style={styles.userInfo}>
+                    <View style={styles.onlineDot} />
+                    <Text style={styles.userNameText}>{username}</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.muteBtn, isMuted ? styles.mutedBtnStyle : styles.unmutedBtnStyle]}
+                    onPress={() => muteWalkieUser(username, !isMuted)}
+                  >
+                    <Ionicons name={isMuted ? "mic-off" : "mic"} size={16} color="#fff" />
+                    <Text style={styles.muteBtnText}>{isMuted ? "مكتوم" : "كتم"}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })
+          )}
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity 
+            style={styles.changePinToggle}
+            onPress={() => setShowPinInput(!showPinInput)}
+          >
+            <Ionicons name="key-outline" size={18} color="#00ffcc" />
+            <Text style={styles.changePinToggleText}>تغيير رمز الـ PIN الإداري</Text>
+          </TouchableOpacity>
+
+          {showPinInput && (
+            <View style={styles.pinChangeBox}>
+              <TextInput
+                style={styles.pinInput}
+                placeholder="أدخل 4 أرقام جديدة"
+                placeholderTextColor="#64748b"
+                keyboardType="numeric"
+                maxLength={4}
+                value={newPin}
+                onChangeText={setNewPin}
+                secureTextEntry
+              />
+              <TouchableOpacity style={styles.savePinBtn} onPress={handleChangePin}>
+                <Text style={styles.savePinBtnText}>حفظ الرمز</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
     </ScrollView>
@@ -111,5 +191,21 @@ const styles = StyleSheet.create({
   advancedSection: { backgroundColor: '#141b2d', marginHorizontal: 20, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#1e293b', marginTop: 10 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#00ffcc', marginBottom: 15, textAlign: 'right' },
   controlRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
-  controlLabel: { color: '#fff', fontSize: 14 }
+  controlLabel: { color: '#fff', fontSize: 14 },
+  divider: { height: 1, backgroundColor: '#1e293b', marginVertical: 15 },
+  userRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0f172a', padding: 12, borderRadius: 10, marginBottom: 8 },
+  userInfo: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' },
+  userNameText: { color: '#fff', fontSize: 14, fontWeight: '500' },
+  muteBtn: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, gap: 5 },
+  unmutedBtnStyle: { backgroundColor: '#ef4444' },
+  mutedBtnStyle: { backgroundColor: '#475569' },
+  muteBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  emptyText: { color: '#64748b', textAlign: 'center', fontSize: 13, marginVertical: 10 },
+  changePinToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  changePinToggleText: { color: '#00ffcc', fontSize: 14, fontWeight: '600' },
+  pinChangeBox: { flexDirection: 'row-reverse', gap: 10, marginTop: 10, alignItems: 'center' },
+  pinInput: { flex: 1, height: 42, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', borderRadius: 8, paddingHorizontal: 10, color: '#fff', textAlign: 'center' },
+  savePinBtn: { backgroundColor: '#00ffcc', paddingHorizontal: 15, height: 42, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  savePinBtnText: { color: '#0b0f19', fontWeight: 'bold', fontSize: 13 }
 });

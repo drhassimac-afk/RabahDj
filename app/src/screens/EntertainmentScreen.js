@@ -36,7 +36,7 @@ export default function EntertainmentScreen() {
   ]);
 
   const games = [
-    { id: 'g1', title: 'لعبة الشطرنج العالمية', icon: 'trophy-outline', players: 'لاعب ضد لاعب', url: 'https://lichess.org/embed' },
+    { id: 'g1', title: 'لعبة الشطرنج العالمية', icon: 'trophy-outline', players: 'لاعب ضد لاعب', url: 'https://lichess.org' },
     { id: 'g2', title: 'تحدي الأرقام والذكاء 2048', icon: 'help-circle-outline', players: 'لاعب واحد', url: 'https://play.2048.co/' }
   ];
 
