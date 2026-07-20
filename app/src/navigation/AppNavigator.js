@@ -6,6 +6,7 @@ import { View, StyleSheet } from 'react-native';
 import { useRabahSocket } from '../context/SocketContext';
 
 import LoginScreen from '../screens/LoginScreen';
+import WelcomeScreen from '../screens/WelcomeScreen';
 import FeedScreen from '../screens/FeedScreen';
 import EntertainmentScreen from '../screens/EntertainmentScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -79,7 +80,8 @@ export default function AppNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!connected ? (
-        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="WelcomeScreen" component={WelcomeScreen} />
+          <Stack.Screen name="LoginScreen" component={LoginScreen} />
       ) : (
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
