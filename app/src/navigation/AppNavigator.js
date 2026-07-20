@@ -80,8 +80,10 @@ export default function AppNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!connected ? (
-        <Stack.Screen name="WelcomeScreen" component={WelcomeScreen} />
+        <>
+          <Stack.Screen name="WelcomeScreen" component={WelcomeScreen} />
           <Stack.Screen name="LoginScreen" component={LoginScreen} />
+        </>
       ) : (
         <>
           <Stack.Screen name="MainTabs" component={TabNavigator} />
