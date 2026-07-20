@@ -1,18 +1,21 @@
 {
-  "name": "rabahdj-advanced-server",
-  "version": "1.2.0",
-  "description": "Advanced local engine for RabahDj App with SQLite persistent storage",
+  "name": "rabahdj-server",
+  "version": "1.0.0",
+  "description": "سيرفر RabahDj المحلي",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
-    "bonjour-service": "^1.4.3",
+    "express": "^4.18.2",
+    "socket.io": "^4.5.4",
     "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "lowdb": "^1.0.0",
     "multer": "^1.4.5-lts.1",
-    "socket.io": "^4.7.5",
-    "sqlite": "^5.1.1"
+    "lowdb": "^1.0.0",
+    "bonjour-service": "^1.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }

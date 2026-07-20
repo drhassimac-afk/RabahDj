@@ -10,24 +10,23 @@ export default function FeedScreen() {
 
   const filteredPosts = posts.filter(p => {
     if (filter === 'image') return !!p.image;
-    if (filter === 'text') return !!p.text;
     return true;
   });
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* شريط الفلتر */}
       <View style={styles.filterBar}>
         <TouchableOpacity onPress={() => setFilter('all')} style={styles.fBtn}><Text style={styles.fText}>الكل</Text></TouchableOpacity>
         <TouchableOpacity onPress={() => setFilter('image')} style={styles.fBtn}><Text style={styles.fText}>بالصور</Text></TouchableOpacity>
       </View>
       
-      {/* تم إضافة key فريد لضمان إعادة رسم الـ Header فور تغيير أي شيء */}
+      {/* إعادة إضافة PostComposer هنا */}
       <FlatList
-        key={filter} 
         data={filteredPosts}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => <PostCard post={item} />}
-        ListHeaderComponent={<PostComposer />}
+        ListHeaderComponent={<PostComposer />} 
       />
     </SafeAreaView>
   );
@@ -35,7 +34,7 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b0f19' },
-  filterBar: { flexDirection: 'row-reverse', padding: 10, gap: 20, justifyContent: 'center', backgroundColor: '#0b0f19' },
-  fBtn: { paddingHorizontal: 15, paddingVertical: 5, borderRadius: 10, backgroundColor: '#141b2d' },
-  fText: { color: '#3b82f6', fontWeight: 'bold' }
+  filterBar: { flexDirection: 'row-reverse', padding: 10, gap: 10, justifyContent: 'center' },
+  fBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, backgroundColor: '#141b2d' },
+  fText: { color: '#ffffff' }
 });

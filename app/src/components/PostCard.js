@@ -1,28 +1,22 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRabahSocket } from '../context/SocketContext';
 
 export default function PostCard({ post }) {
-  const { toggleLike, addComment, userName } = useRabahSocket();
-  const [showComments, setShowComments] = useState(false);
-  const [commentInput, setCommentInput] = useState('');
+  const { toggleLike, userName } = useRabahSocket();
 
   if (!post) return null;
 
+  // القراءة المباشرة من الـ post الممرر من Context بدون استجابة لـ useState محلية تمنع التحديث
   const currentUser = userName || 'رابح';
   const likesList = Array.isArray(post.likes) ? post.likes : [];
-  const commentsList = Array.isArray(post.comments) ? post.comments : [];
   const isLiked = likesList.includes(currentUser);
+  const likesCount = likesList.length;
+  const commentsCount = Array.isArray(post.comments) ? post.comments.length : 0;
 
   const authorName = typeof post.author === 'string' && post.author ? post.author : 'رابح';
   const initialLetter = authorName.charAt(0).toUpperCase() || 'R';
-
-  const handleSendComment = () => {
-    if (!commentInput.trim()) return;
-    addComment(post.id, commentInput.trim());
-    setCommentInput('');
-  };
 
   return (
     <View style={styles.card}>
@@ -37,6 +31,11 @@ export default function PostCard({ post }) {
       {/* المحتوى النصي */}
       {post.text ? <Text style={styles.contentText}>{post.text}</Text> : null}
 
+      {/* المحتوى الصوري */}
+      {post.image && !post.image.includes("404") ? (
+        <Image source={{ uri: post.image }} style={styles.postImage} resizeMode="cover" />
+      ) : null}
+
       {/* أزرار التفاعل */}
       <View style={styles.footer}>
         <TouchableOpacity 
@@ -50,60 +49,15 @@ export default function PostCard({ post }) {
             color={isLiked ? "#ef4444" : "#94a3b8"}
           />
           <Text style={[styles.actionText, isLiked && styles.likedText]}>
-            {likesList.length}
+            {likesCount}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.actionBtn} 
-          onPress={() => setShowComments(!showComments)}
-          activeOpacity={0.7}
-        >
-          <Ionicons 
-            name="chatbubble-outline" 
-            size={20} 
-            color={showComments ? "#3b82f6" : "#94a3b8"} 
-          />
-          <Text style={[styles.actionText, showComments && { color: "#3b82f6" }]}>
-            {commentsList.length}
-          </Text>
+        <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+          <Ionicons name="chatbubble-outline" size={20} color="#94a3b8" />
+          <Text style={styles.actionText}>{commentsCount}</Text>
         </TouchableOpacity>
       </View>
-
-      {/* قسم التعليقات التفاعلي */}
-      {showComments && (
-        <View style={styles.commentsSection}>
-          {/* قائمة التعليقات الحالية */}
-          {commentsList.length > 0 ? (
-            commentsList.map((c, idx) => (
-              <View key={c.id || idx} style={styles.commentItem}>
-                <Text style={styles.commentAuthor}>{c.author || 'مستخدم'}:</Text>
-                <Text style={styles.commentText}>{c.text}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noCommentsText}>لا توجد تعليقات بعد. كن أول من يعلق!</Text>
-          )}
-
-          {/* حقل إدخال تعليق جديد */}
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="اكتب تعليقاً..."
-              placeholderTextColor="#64748b"
-              value={commentInput}
-              onChangeText={setCommentInput}
-            />
-            <TouchableOpacity 
-              style={[styles.sendCommentBtn, !commentInput.trim() && { opacity: 0.5 }]} 
-              onPress={handleSendComment}
-              disabled={!commentInput.trim()}
-            >
-              <Ionicons name="send" size={16} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
@@ -144,10 +98,17 @@ const styles = StyleSheet.create({
   },
   contentText: {
     color: '#e2e8f0',
-    fontSize: 15,
+    fontSize: 14,
     lineHeight: 22,
     textAlign: 'right',
     marginBottom: 10,
+  },
+  postImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: '#0f172a',
   },
   footer: {
     flexDirection: 'row-reverse',
@@ -170,63 +131,5 @@ const styles = StyleSheet.create({
   likedText: {
     color: '#ef4444',
     fontWeight: 'bold',
-  },
-  // تنسيقات التعليقات
-  commentsSection: {
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#0f172a',
-  },
-  commentItem: {
-    backgroundColor: '#0f172a',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 6,
-    flexDirection: 'row-reverse',
-    gap: 6,
-  },
-  commentAuthor: {
-    color: '#00ffcc',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  commentText: {
-    color: '#cbd5e1',
-    fontSize: 12,
-    flex: 1,
-    textAlign: 'right',
-  },
-  noCommentsText: {
-    color: '#64748b',
-    fontSize: 12,
-    textAlign: 'center',
-    marginVertical: 6,
-  },
-  commentInputRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  commentInput: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    color: '#ffffff',
-    fontSize: 13,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#334155',
-    textAlign: 'right',
-  },
-  sendCommentBtn: {
-    backgroundColor: '#3b82f6',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
