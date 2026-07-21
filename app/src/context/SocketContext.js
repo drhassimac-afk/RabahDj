@@ -40,8 +40,11 @@ export function SocketProvider({ children }) {
       if (data && data.posts) setPosts(data.posts);
     });
 
-    socket.on("postAdded", (post) => {
-      setPosts((prev) => [post, ...prev.filter(p => p.id !== post.id)]);
+    // أضف هذا داخل دالة connect
+    socket.on("postUpdated", (updatedPost) => {
+      setPosts((prev) => 
+        prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+      );
     });
 
     socketRef.current = socket;
@@ -111,7 +114,7 @@ export function SocketProvider({ children }) {
     );
 
     if (socketRef.current?.connected) {
-      socketRef.current.emit("addComment", { postId, comment: newComment });
+      socketRef.current.emit("newComment", { postId, comment: newComment });
     }
   };
 
