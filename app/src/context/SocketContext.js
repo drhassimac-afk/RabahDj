@@ -8,16 +8,7 @@ export function SocketProvider({ children }) {
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
   const [userName, setUserName] = useState("رابح");
-  const [posts, setPosts] = useState([
-    {
-      id: "demo-1",
-      author: "رابح",
-      text: "مرحباً بك! جرب كتابة تعليق الآن.",
-      likes: [],
-      comments: [{ id: "c1", author: "علي", text: "تطبيق رائع!" }],
-      createdAt: new Date().toISOString(),
-    }
-  ]);
+  const [posts, setPosts] = useState([]);
 
   useEffect(() => {
     AsyncStorage.getItem("rabahdj_last_name").then(name => name && setUserName(name));
@@ -40,7 +31,11 @@ export function SocketProvider({ children }) {
       if (data && data.posts) setPosts(data.posts);
     });
 
-    // أضف هذا داخل دالة connect
+    socket.on("postAdded", (post) => {
+      setPosts((prev) => [post, ...prev.filter(p => p.id !== post.id)]);
+    });
+
+    // ✅ تم إضافة الاستماع لتحديثات المنشورات (لايك/تعليق)
     socket.on("postUpdated", (updatedPost) => {
       setPosts((prev) => 
         prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
@@ -53,31 +48,22 @@ export function SocketProvider({ children }) {
   const publishPost = (text) => {
     if (!text.trim()) return;
 
-    const newPost = {
-      id: Date.now().toString(),
-      author: userName || "رابح",
-      text: text.trim(),
-      likes: [],
-      comments: [],
-      createdAt: new Date().toISOString(),
-    };
-
-    setPosts((prev) => [newPost, ...prev]);
-
     if (socketRef.current?.connected) {
+      // نرسل للسيرفر، والسيرفر سيقوم بـ broadcast للجميع بما فيهم نحن
       socketRef.current.emit("newPost", { text: text.trim(), image: null });
     }
   };
 
   const toggleLike = (postId) => {
+    // التحديث الفوري لتسريع الواجهة
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id === postId) {
           const likes = p.likes || [];
-          const isLiked = likes.includes(userName);
+          const isLiked = likes.includes(socketRef.current.id); // نستخدم الـ ID أفضل
           return {
             ...p,
-            likes: isLiked ? likes.filter((u) => u !== userName) : [...likes, userName],
+            likes: isLiked ? likes.filter((id) => id !== socketRef.current.id) : [...likes, socketRef.current.id],
           };
         }
         return p;
@@ -89,32 +75,13 @@ export function SocketProvider({ children }) {
     }
   };
 
-  // دالة إضافة تعليق تفاعلي فوري
   const addComment = (postId, commentText) => {
     if (!commentText.trim()) return;
 
-    const newComment = {
-      id: Date.now().toString(),
-      author: userName || "رابح",
-      text: commentText.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id === postId) {
-          const currentComments = Array.isArray(p.comments) ? p.comments : [];
-          return {
-            ...p,
-            comments: [...currentComments, newComment],
-          };
-        }
-        return p;
-      })
-    );
-
+    // ✅ تم تصحيح اسم الحدث إلى newComment ليطابق السيرفر
+    // ✅ تم إرسال البيانات بالشكل الذي يتوقعه السيرفر { postId, text }
     if (socketRef.current?.connected) {
-      socketRef.current.emit("newComment", { postId, comment: newComment });
+      socketRef.current.emit("newComment", { postId, text: commentText.trim() });
     }
   };
 
