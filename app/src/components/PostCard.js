@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRabahSocket } from '../context/SocketContext';
 
 export default function PostCard({ post }) {
-  const { toggleLike, userName } = useRabahSocket();
+  const { toggleLike, addComment } = useRabahSocket();
 
   if (!post) return null;
 

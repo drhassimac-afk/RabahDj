@@ -12,7 +12,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rabahdj.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,12 +30,12 @@
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 24,
-            "kotlinVersion": "1.9.24"
+            "minSdkVersion": 24
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-video"
     ]
   }
 }
-

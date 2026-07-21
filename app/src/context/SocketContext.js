@@ -48,7 +48,6 @@ export function SocketProvider({ children }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [mySocketId, setMySocketId] = useState(null);
 
-  // ✅ تحميل الاسم واللون المحفوظين
   useEffect(() => {
     const loadSaved = async () => {
       try {
@@ -63,7 +62,6 @@ export function SocketProvider({ children }) {
     loadSaved();
   }, []);
 
-  // ✅ دالة الاتصال الكاملة
   const connect = useCallback(async (ip, name) => {
     const color = randomColor();
     setUserName(name);
@@ -76,7 +74,6 @@ export function SocketProvider({ children }) {
       console.error('خطأ في حفظ البيانات:', err);
     }
 
-    // قطع الاتصال القديم
     if (socketRef.current) {
       socketRef.current.disconnect();
       socketRef.current = null;
@@ -90,7 +87,6 @@ export function SocketProvider({ children }) {
       reconnectionDelay: 2000,
     });
 
-    // ✅ عند الاتصال
     socket.on("connect", () => {
       console.log('✅ متصل بالسيرفر');
       setConnected(true);
@@ -98,7 +94,6 @@ export function SocketProvider({ children }) {
       socket.emit("join", { name, avatarColor: color });
     });
 
-    // ✅ استقبال البيانات الأولية
     socket.on("init", (data) => {
       if (data?.posts) {
         setPosts(data.posts);
@@ -108,31 +103,26 @@ export function SocketProvider({ children }) {
       }
     });
 
-    // ✅ منشور جديد
     socket.on("postAdded", (post) => {
       setPosts((prev) => [post, ...prev.filter(p => p.id !== post.id)]);
     });
 
-    // ✅ تحديث منشور (إعجابات + تعليقات)
     socket.on("postUpdated", (updatedPost) => {
       setPosts((prev) =>
         prev.map(p => p.id === updatedPost.id ? updatedPost : p)
       );
     });
 
-    // ✅ تحديث المتصلين
     socket.on("onlineUsers", (users) => {
       setOnlineUsers(users);
     });
 
-    // ✅ معالجة قطع الاتصال
     socket.on("disconnect", (reason) => {
       console.log('❌ انقطع الاتصال:', reason);
       setConnected(false);
       setOnlineUsers([]);
     });
 
-    // ✅ معالجة أخطاء الاتصال
     socket.on("connect_error", (err) => {
       console.error('خطأ في الاتصال:', err.message);
       setConnected(false);
@@ -141,7 +131,6 @@ export function SocketProvider({ children }) {
     socketRef.current = socket;
   }, []);
 
-  // ✅ نشر منشور جديد
   const publishPost = useCallback((text, image = null) => {
     if (!text?.trim() && !image) return;
 
@@ -151,7 +140,6 @@ export function SocketProvider({ children }) {
         image: image || null,
       });
     } else {
-      // ✅ نشر محلي إذا لم يكن متصلاً
       const newPost = {
         id: Date.now().toString(),
         authorName: userName || 'مستخدم',
@@ -166,9 +154,7 @@ export function SocketProvider({ children }) {
     }
   }, [userName, avatarColor]);
 
-  // ✅ إعجاب بالمنشور
   const toggleLike = useCallback((postId) => {
-    // تحديث محلي فوري
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id === postId) {
@@ -185,17 +171,14 @@ export function SocketProvider({ children }) {
       })
     );
 
-    // إرسال للسيرفر
     if (socketRef.current?.connected) {
       socketRef.current.emit("toggleLike", { postId });
     }
   }, [mySocketId, userName]);
 
-  // ✅ إضافة تعليق
   const addComment = useCallback((postId, commentText) => {
     if (!commentText?.trim()) return;
 
-    // تحديث محلي فوري
     const newComment = {
       id: Date.now().toString(),
       authorName: userName || 'مستخدم',
@@ -216,7 +199,6 @@ export function SocketProvider({ children }) {
       })
     );
 
-    // ✅ الاسم الصحيح للحدث "newComment"
     if (socketRef.current?.connected) {
       socketRef.current.emit("newComment", {
         postId,
@@ -225,7 +207,6 @@ export function SocketProvider({ children }) {
     }
   }, [userName, avatarColor]);
 
-  // ✅ قطع الاتصال يدوياً
   const disconnect = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.disconnect();

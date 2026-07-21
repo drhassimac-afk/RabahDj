@@ -1,0 +1,27 @@
+{
+  "name": "rabahdj",
+  "version": "1.0.0",
+  "description": "شبكة اجتماعية محلية بتصميم احترافي يشبه فيسبوك، تعمل بالكامل عبر شبكة **واي فاي محلية بدون إنترنت**. الأجهزة المتصلة بنفس الشبكة تتبادل المنشورات والإعجابات والتعليقات في الوقت الفعلي.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://TOKEN_%D8%A7%D9%84%D8%AC%D8%AF%D9%8A%D8%AF_%D9%87%D9%86%D8%A7@github.com/drhassimac-afk/RabahDj.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/drhassimac-afk/RabahDj/issues"
+  },
+  "homepage": "https://github.com/drhassimac-afk/RabahDj#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "socket.io": "^4.8.3"
+  }
+}
