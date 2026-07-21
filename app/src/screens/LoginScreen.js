@@ -1,4 +1,6 @@
-<View style={styles.inputGroup}>
+<View style={styles.container}> {/* هذه الحاوية الأم ضرورية */}
+
+  <View style={styles.inputGroup}>
     <Text style={styles.label}>عنوان IP السيرفر:</Text>
     <TextInput
       style={styles.input}
@@ -33,4 +35,5 @@
       <Text style={styles.btnText}>دخول والتوصيل</Text>
     )}
   </TouchableOpacity>
-</View>
+
+</View> {/* إغلاق الحاوية الأم */}
