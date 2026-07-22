@@ -1,14 +1,29 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { SocketContext } from '../context/SocketContext';
 
 export default function LoginScreen({ navigation }) {
-  // تأكد أن هذه الحالات معرفة هنا
+  const { connect } = useContext(SocketContext);
   const [ip, setIp] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleConnect = () => {
-    // منطق الاتصال الخاص بك هنا
+  const handleConnect = async () => {
+    if (!ip.trim() || !name.trim()) {
+      Alert.alert('خطأ', 'يرجى إدخال عنوان IP واسم المستخدم');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await connect(ip.trim(), name.trim());
+      navigation.replace('MainTabs');
+    } catch (err) {
+      Alert.alert('فشل الاتصال', 'تأكد من عنوان IP وأن السيرفر يعمل');
+      console.error('خطأ الاتصال:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

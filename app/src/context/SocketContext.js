@@ -62,73 +62,94 @@ export function SocketProvider({ children }) {
     loadSaved();
   }, []);
 
-  const connect = useCallback(async (ip, name) => {
-    const color = randomColor();
-    setUserName(name);
-    setAvatarColor(color);
+  // ✅ دالة الاتصال - ترجع Promise حقيقي ينجح أو يفشل حسب نتيجة الاتصال الفعلية
+  const connect = useCallback((ip, name) => {
+    return new Promise((resolve, reject) => {
+      const color = randomColor();
+      setUserName(name);
+      setAvatarColor(color);
 
-    try {
-      await AsyncStorage.setItem("rabahdj_last_name", name);
-      await AsyncStorage.setItem("rabahdj_avatar_color", color);
-    } catch (err) {
-      console.error('خطأ في حفظ البيانات:', err);
-    }
+      AsyncStorage.setItem("rabahdj_last_name", name).catch(() => {});
+      AsyncStorage.setItem("rabahdj_avatar_color", color).catch(() => {});
 
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-
-    const socket = io(`http://${ip}:4000`, {
-      transports: ["websocket"],
-      timeout: 8000,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
-    });
-
-    socket.on("connect", () => {
-      console.log('✅ متصل بالسيرفر');
-      setConnected(true);
-      setMySocketId(socket.id);
-      socket.emit("join", { name, avatarColor: color });
-    });
-
-    socket.on("init", (data) => {
-      if (data?.posts) {
-        setPosts(data.posts);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
-      if (data?.onlineUsers) {
-        setOnlineUsers(data.onlineUsers);
-      }
-    });
 
-    socket.on("postAdded", (post) => {
-      setPosts((prev) => [post, ...prev.filter(p => p.id !== post.id)]);
-    });
+      const socket = io(`http://${ip}:4000`, {
+        transports: ["websocket"],
+        timeout: 8000,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 2000,
+      });
 
-    socket.on("postUpdated", (updatedPost) => {
-      setPosts((prev) =>
-        prev.map(p => p.id === updatedPost.id ? updatedPost : p)
-      );
-    });
+      let settled = false;
 
-    socket.on("onlineUsers", (users) => {
-      setOnlineUsers(users);
-    });
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          socket.disconnect();
+          reject(new Error('انتهت مهلة الاتصال'));
+        }
+      }, 9000);
 
-    socket.on("disconnect", (reason) => {
-      console.log('❌ انقطع الاتصال:', reason);
-      setConnected(false);
-      setOnlineUsers([]);
-    });
+      socket.on("connect", () => {
+        console.log('✅ متصل بالسيرفر');
+        setConnected(true);
+        setMySocketId(socket.id);
+        socket.emit("join", { name, avatarColor: color });
 
-    socket.on("connect_error", (err) => {
-      console.error('خطأ في الاتصال:', err.message);
-      setConnected(false);
-    });
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeoutId);
+          resolve();
+        }
+      });
 
-    socketRef.current = socket;
+      socket.on("connect_error", (err) => {
+        console.error('خطأ في الاتصال:', err.message);
+        setConnected(false);
+
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(err);
+        }
+      });
+
+      socket.on("init", (data) => {
+        if (data?.posts) {
+          setPosts(data.posts);
+        }
+        if (data?.onlineUsers) {
+          setOnlineUsers(data.onlineUsers);
+        }
+      });
+
+      socket.on("postAdded", (post) => {
+        setPosts((prev) => [post, ...prev.filter(p => p.id !== post.id)]);
+      });
+
+      socket.on("postUpdated", (updatedPost) => {
+        setPosts((prev) =>
+          prev.map(p => p.id === updatedPost.id ? updatedPost : p)
+        );
+      });
+
+      socket.on("onlineUsers", (users) => {
+        setOnlineUsers(users);
+      });
+
+      socket.on("disconnect", (reason) => {
+        console.log('❌ انقطع الاتصال:', reason);
+        setConnected(false);
+        setOnlineUsers([]);
+      });
+
+      socketRef.current = socket;
+    });
   }, []);
 
   const publishPost = useCallback((text, image = null) => {
