@@ -9,8 +9,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRabahSocket } from '../context/SocketContext';
 import PostCard from '../components/PostCard';
 import PostComposer from '../components/PostComposer';
+import WalkieTalkieButton from '../components/WalkieTalkieButton';
 
-export default function FeedScreen() {
+export default function FeedScreen({ navigation }) {
   const { posts, connected, onlineUsers } = useRabahSocket();
   const [filter, setFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -120,6 +121,16 @@ export default function FeedScreen() {
           />
         }
       />
+
+      <WalkieTalkieButton />
+
+      <TouchableOpacity
+        style={styles.liveButton}
+        onPress={() => navigation.navigate('LiveStreamScreen')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="videocam" size={22} color="#fff" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -208,6 +219,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
+  },
+  liveButton: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
 });
 

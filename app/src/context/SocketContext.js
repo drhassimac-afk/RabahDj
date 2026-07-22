@@ -269,6 +269,7 @@ export function SocketProvider({ children }) {
         onlineUsers,
         mySocketId,
         walkieSettings,
+        socket: socketRef.current,
         connect,
         disconnect,
         publishPost,

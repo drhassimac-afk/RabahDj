@@ -74,6 +74,7 @@ let db = null; // ✅ نبدأ بـ null ونتحقق منها
 
 let currentBroadcaster = null;
 let walkieSettings = { enabled: true, mutedUsers: [] };
+let streamRooms = {}; // { roomName: { broadcasterId: null, viewers: Set() } }
 
 // ========================================
 // ✅ إصلاح: تهيئة قاعدة البيانات وإرجاع نتيجة
@@ -587,6 +588,67 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ========================================
+    // ✅ نظام البث المباشر (WebRTC Signaling)
+    // ========================================
+    socket.on('join-stream-room', (data) => {
+        const room = data?.room;
+        const role = data?.role; // 'broadcaster' أو 'viewer'
+        if (!room) return;
+
+        if (!streamRooms[room]) {
+            streamRooms[room] = { broadcasterId: null, viewers: new Set() };
+        }
+
+        socket.join(room);
+
+        if (role === 'broadcaster') {
+            streamRooms[room].broadcasterId = socket.id;
+            console.log(`📡 بدأ بث مباشر في غرفة: ${room}`);
+            // إعلام المذيع بكل المشاهدين الموجودين مسبقاً بالغرفة
+            streamRooms[room].viewers.forEach((viewerId) => {
+                socket.emit('viewer-joined', { viewerId });
+            });
+        } else {
+            streamRooms[room].viewers.add(socket.id);
+            // إخبار المذيع بوجود مشاهد جديد ليبدأ اتصال WebRTC معه
+            if (streamRooms[room].broadcasterId) {
+                io.to(streamRooms[room].broadcasterId).emit('viewer-joined', {
+                    viewerId: socket.id,
+                });
+            }
+        }
+    });
+
+    socket.on('leave-stream-room', (data) => {
+        const room = data?.room;
+        if (!room || !streamRooms[room]) return;
+
+        socket.leave(room);
+        streamRooms[room].viewers.delete(socket.id);
+
+        if (streamRooms[room].broadcasterId === socket.id) {
+            io.to(room).emit('stream-ended');
+            streamRooms[room].broadcasterId = null;
+        }
+    });
+
+    // تمرير عروض/إجابات/مرشحات ICE بين طرفين محددين
+    socket.on('webrtc-offer', (data) => {
+        if (!data?.to) return;
+        io.to(data.to).emit('webrtc-offer', { from: socket.id, offer: data.offer });
+    });
+
+    socket.on('webrtc-answer', (data) => {
+        if (!data?.to) return;
+        io.to(data.to).emit('webrtc-answer', { from: socket.id, answer: data.answer });
+    });
+
+    socket.on('webrtc-ice-candidate', (data) => {
+        if (!data?.to) return;
+        io.to(data.to).emit('webrtc-ice-candidate', { from: socket.id, candidate: data.candidate });
+    });
+
     // === قطع الاتصال ===
     socket.on('disconnect', () => {
         const user = activeUsers.get(socket.id);
@@ -601,6 +663,16 @@ io.on('connection', (socket) => {
             io.emit('radio_state_change', { active: false });
             console.log(`⚠️ انقطع اتصال الـ DJ، تم إيقاف البث`);
         }
+
+        // ✅ تنظيف غرف البث المباشر عند قطع الاتصال
+        Object.keys(streamRooms).forEach((room) => {
+            const r = streamRooms[room];
+            r.viewers.delete(socket.id);
+            if (r.broadcasterId === socket.id) {
+                io.to(room).emit('stream-ended');
+                r.broadcasterId = null;
+            }
+        });
     });
 });
 

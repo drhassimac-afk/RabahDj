@@ -13,6 +13,7 @@ import FeedScreen from './src/screens/FeedScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import EntertainmentScreen from './src/screens/EntertainmentScreen';
 import AdminScreen from './src/screens/AdminScreen';
+import LiveStreamScreen from './src/screens/LiveStreamScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -87,6 +88,7 @@ export default function App() {
             <Stack.Screen name="LoginScreen" component={LoginScreen} />
             <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="AdminScreen" component={AdminScreen} />
+          <Stack.Screen name="LiveStreamScreen" component={LiveStreamScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </SocketProvider>
