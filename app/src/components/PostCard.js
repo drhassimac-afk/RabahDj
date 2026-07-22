@@ -4,12 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRabahSocket } from '../context/SocketContext';
 
 export default function PostCard({ post }) {
-  const { toggleLike, addComment } = useRabahSocket();
+  const { toggleLike, addComment, userName, mySocketId } = useRabahSocket();
 
   if (!post) return null;
 
   // القراءة المباشرة من الـ post الممرر من Context بدون استجابة لـ useState محلية تمنع التحديث
-  const currentUser = userName || 'رابح';
+  const currentUser = mySocketId || userName || 'رابح';
   const likesList = Array.isArray(post.likes) ? post.likes : [];
   const isLiked = likesList.includes(currentUser);
   const likesCount = likesList.length;
