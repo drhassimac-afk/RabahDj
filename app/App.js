@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SocketProvider } from './src/context/SocketContext';
 
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -16,6 +17,8 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -23,8 +26,8 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: '#141b2d',
           borderTopWidth: 0,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom + 8,
           paddingTop: 4,
         },
         tabBarActiveTintColor: '#3b82f6',
@@ -68,21 +71,23 @@ function MainTabs() {
 
 export default function App() {
   return (
-    <SocketProvider>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="#0b0f19"
-      />
-      <NavigationContainer>
-        <Stack.Navigator
-          screenOptions={{ headerShown: false }}
-          initialRouteName="WelcomeScreen"
-        >
-          <Stack.Screen name="WelcomeScreen" component={WelcomeScreen} />
-          <Stack.Screen name="LoginScreen" component={LoginScreen} />
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SocketProvider>
+    <SafeAreaProvider>
+      <SocketProvider>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="#0b0f19"
+        />
+        <NavigationContainer>
+          <Stack.Navigator
+            screenOptions={{ headerShown: false }}
+            initialRouteName="WelcomeScreen"
+          >
+            <Stack.Screen name="WelcomeScreen" component={WelcomeScreen} />
+            <Stack.Screen name="LoginScreen" component={LoginScreen} />
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SocketProvider>
+    </SafeAreaProvider>
   );
 }
