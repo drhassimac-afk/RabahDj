@@ -47,6 +47,7 @@ export function SocketProvider({ children }) {
   const [posts, setPosts] = useState(DEMO_POSTS);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [mySocketId, setMySocketId] = useState(null);
+  const [walkieSettings, setWalkieSettings] = useState({ enabled: true, mutedUsers: [] });
 
   useEffect(() => {
     const loadSaved = async () => {
@@ -142,6 +143,11 @@ export function SocketProvider({ children }) {
         setOnlineUsers(users);
       });
 
+      // ✅ تحديثات نظام الـ Walkie-Talkie من الأدمن
+      socket.on("walkie_settings_update", (settings) => {
+        setWalkieSettings(settings);
+      });
+
       socket.on("disconnect", (reason) => {
         console.log('❌ انقطع الاتصال:', reason);
         setConnected(false);
@@ -228,6 +234,20 @@ export function SocketProvider({ children }) {
     }
   }, [userName, avatarColor]);
 
+  // ✅ تفعيل/تعطيل نظام الـ Walkie-Talkie (للأدمن)
+  const toggleWalkieSystem = useCallback((enabled) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("admin_toggle_walkie", { enabled: !!enabled });
+    }
+  }, []);
+
+  // ✅ كتم/فك كتم مستخدم في الـ Walkie-Talkie (للأدمن)
+  const muteWalkieUser = useCallback((username, muted) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("admin_mute_user", { username, muted: !!muted });
+    }
+  }, []);
+
   const disconnect = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.disconnect();
@@ -248,11 +268,14 @@ export function SocketProvider({ children }) {
         setPosts,
         onlineUsers,
         mySocketId,
+        walkieSettings,
         connect,
         disconnect,
         publishPost,
         toggleLike,
         addComment,
+        toggleWalkieSystem,
+        muteWalkieUser,
       }}
     >
       {children}
