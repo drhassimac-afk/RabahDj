@@ -46,11 +46,11 @@ jobs:
         run: |
           mkdir -p app/android/app/src/main/assets
 
-      # البديل الرسمي من Expo لتوليد ملف الـ JS وضخه إجبارياً داخل نسخة الـ Debug
+      # الحل الذكي: إزالة سياق "--entry-file index.js" وترك Expo يكتشف ملف الدخول (مثل App.js) تلقائياً
       - name: 📦 Force Generate JS Bundle for Debug (Expo Native Way)
         run: |
           cd app
-          npx expo export:embed --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+          npx expo export:embed --platform android --dev false --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
 
       - name: 🚀 Build Android Debug APK (With Injected JS)
         env:
