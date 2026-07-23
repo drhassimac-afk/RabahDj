@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet, Text, View, FlatList, TouchableOpacity,
   Image, Dimensions, SafeAreaView, Alert
@@ -52,24 +52,49 @@ const GAMES = [
     title: 'تحدي 2048',
     icon: 'help-circle-outline',
     players: 'لاعب واحد',
-    url: 'https://play.2048.co/',
-    needsInternet: true,
+    type: 'native',
+    screen: 'Game2048Screen',
   },
   {
     id: 'g3',
     title: 'سودوكو',
     icon: 'grid-outline',
     players: 'لاعب واحد',
-    url: 'https://sudoku.com',
-    needsInternet: true,
+    type: 'native',
+    screen: 'SudokuScreen',
   },
 ];
 
-export default function EntertainmentScreen() {
-  const { connected } = useRabahSocket();
+export default function EntertainmentScreen({ navigation }) {
+  const { connected, serverIp } = useRabahSocket();
   const [activeTab, setActiveTab] = useState('movies');
   const [selectedUrl, setSelectedUrl] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
+  const [localMovies, setLocalMovies] = useState([]);
+
+  // ✅ جلب قائمة الأفلام المحلية المخزنة على السيرفر
+  useEffect(() => {
+    if (!connected || !serverIp) return;
+
+    fetch(`http://${serverIp}:4000/media-list`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.movies)) {
+          setLocalMovies(
+            data.movies.map((m) => ({
+              id: m.id,
+              title: m.title,
+              duration: '',
+              category: 'مكتبة محلية',
+              thumbnail: null,
+              url: m.url,
+              isWeb: false,
+            }))
+          );
+        }
+      })
+      .catch((err) => console.error('خطأ جلب الأفلام المحلية:', err));
+  }, [connected, serverIp]);
 
   const handlePlayMovie = useCallback((movie) => {
     if (movie.isWeb) {
@@ -82,6 +107,10 @@ export default function EntertainmentScreen() {
   }, []);
 
   const handleOpenGame = useCallback((game) => {
+    if (game.type === 'native') {
+      navigation.navigate(game.screen);
+      return;
+    }
     if (game.needsInternet && !connected) {
       Alert.alert(
         '⚠️ تنبيه',
@@ -92,7 +121,7 @@ export default function EntertainmentScreen() {
     }
     setSelectedType('web');
     setSelectedUrl(game.url);
-  }, [connected]);
+  }, [connected, navigation]);
 
   const handleClose = useCallback(() => {
     setSelectedUrl(null);
@@ -177,7 +206,7 @@ export default function EntertainmentScreen() {
       {/* قائمة الأفلام */}
       {activeTab === 'movies' ? (
         <FlatList
-          data={MOVIES}
+          data={[...MOVIES, ...localMovies]}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -187,10 +216,16 @@ export default function EntertainmentScreen() {
               onPress={() => handlePlayMovie(item)}
               activeOpacity={0.8}
             >
-              <Image
-                source={{ uri: item.thumbnail }}
-                style={styles.movieImage}
-              />
+              {item.thumbnail ? (
+                <Image
+                  source={{ uri: item.thumbnail }}
+                  style={styles.movieImage}
+                />
+              ) : (
+                <View style={[styles.movieImage, styles.movieImageFallback]}>
+                  <Ionicons name="film" size={28} color="#3b82f6" />
+                </View>
+              )}
               <View style={styles.movieDetails}>
                 <Text style={styles.movieTitle} numberOfLines={2}>
                   {item.title}
@@ -353,6 +388,10 @@ const styles = StyleSheet.create({
     height: 85,
     borderRadius: 12,
     backgroundColor: '#0f172a',
+  },
+  movieImageFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   movieDetails: {
     flex: 1,

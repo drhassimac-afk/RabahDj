@@ -44,6 +44,32 @@ if (!fs.existsSync(uploadDir)) {
 }
 app.use('/files', express.static(uploadDir));
 
+// ✅ مجلد الأفلام المحلية - حط ملفات الفيديو هنا يدوياً
+const mediaDir = path.join(__dirname, 'media');
+if (!fs.existsSync(mediaDir)) {
+    fs.mkdirSync(mediaDir, { recursive: true });
+}
+app.use('/media', express.static(mediaDir));
+
+// ✅ قائمة الأفلام المحلية المتاحة حالياً
+app.get('/media-list', (req, res) => {
+    try {
+        const validExt = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v'];
+        const files = fs.readdirSync(mediaDir).filter((f) =>
+            validExt.includes(path.extname(f).toLowerCase())
+        );
+        const movies = files.map((f) => ({
+            id: f,
+            title: path.basename(f, path.extname(f)),
+            url: `http://${LOCAL_IP}:${PORT}/media/${encodeURIComponent(f)}`,
+        }));
+        res.json({ movies });
+    } catch (err) {
+        console.error('خطأ في قراءة مجلد الأفلام:', err);
+        res.status(500).json({ error: 'تعذر قراءة مجلد الأفلام' });
+    }
+});
+
 // ✅ إصلاح: تحديد حد لحجم الملفات (50MB)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),

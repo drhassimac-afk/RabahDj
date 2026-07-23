@@ -14,6 +14,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import EntertainmentScreen from './src/screens/EntertainmentScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import LiveStreamScreen from './src/screens/LiveStreamScreen';
+import Game2048Screen from './src/screens/Game2048Screen';
+import SudokuScreen from './src/screens/SudokuScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -89,6 +91,8 @@ export default function App() {
             <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="AdminScreen" component={AdminScreen} />
           <Stack.Screen name="LiveStreamScreen" component={LiveStreamScreen} />
+          <Stack.Screen name="Game2048Screen" component={Game2048Screen} />
+          <Stack.Screen name="SudokuScreen" component={SudokuScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </SocketProvider>
