@@ -46,9 +46,18 @@
       "image": null,
       "likes": [
         "NNApyST5QJPwKTWBAAAB",
-        "i5NvICBSapr4i96fAAAX"
+        "i5NvICBSapr4i96fAAAX",
+        "vPNB19xTroykys6gAAAR"
       ],
-      "comments": [],
+      "comments": [
+        {
+          "id": "1784756234534",
+          "authorName": "Rabah",
+          "avatarColor": "#8b5cf6",
+          "text": "السلام عليم",
+          "createdAt": "2026-07-22T21:37:14.535Z"
+        }
+      ],
       "createdAt": "2026-07-19T14:19:48.478Z"
     },
     {

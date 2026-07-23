@@ -390,8 +390,8 @@ io.on('connection', (socket) => {
             const user = activeUsers.get(socket.id);
             if (!user) return;
 
-            // ✅ إصلاح: التحقق من أن النص أو الصورة موجودان
-            if (!data.text && !data.image) {
+            // ✅ إصلاح: التحقق من أن النص أو الصورة أو الملف موجودون
+            if (!data.text && !data.image && !data.file) {
                 socket.emit('error', { message: 'المنشور لا يمكن أن يكون فارغاً' });
                 return;
             }
@@ -406,6 +406,7 @@ io.on('connection', (socket) => {
                 avatarColor: user.avatarColor,
                 text: data.text?.trim() || '',
                 image: data.image || null,
+                file: data.file || null,
                 likes: [],
                 comments: [],
                 createdAt: new Date().toISOString(),

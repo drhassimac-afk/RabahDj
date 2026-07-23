@@ -1,12 +1,46 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, Modal, TextInput, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, Modal, TextInput, FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import { useRabahSocket } from '../context/SocketContext';
+
+function InlineVideoPreview({ url }) {
+  const player = useVideoPlayer(url, (p) => {
+    p.loop = false;
+  });
+
+  return (
+    <VideoView
+      style={styles.postImage}
+      player={player}
+      allowsFullscreen
+      allowsPictureInPicture
+    />
+  );
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} كيلوبايت`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} ميغابايت`;
+}
+
+function fileIconFor(mimetype) {
+  if (!mimetype) return 'document-outline';
+  if (mimetype.includes('pdf')) return 'document-text-outline';
+  if (mimetype.startsWith('audio/')) return 'musical-notes-outline';
+  if (mimetype.includes('zip') || mimetype.includes('android.package')) return 'archive-outline';
+  return 'document-attach-outline';
+}
 
 export default function PostCard({ post }) {
   const { toggleLike, addComment, userName, mySocketId } = useRabahSocket();
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [downloading, setDownloading] = useState(false);
 
   if (!post) return null;
 
@@ -20,10 +54,47 @@ export default function PostCard({ post }) {
   const authorName = typeof post.author === 'string' && post.author ? post.author : 'رابح';
   const initialLetter = authorName.charAt(0).toUpperCase() || 'R';
 
+  const file = post.file || null;
+  const isImageFile = file?.mimetype?.startsWith('image/');
+  const isVideoFile = file?.mimetype?.startsWith('video/');
+
   const handleSendComment = () => {
     if (!commentText.trim()) return;
     addComment(post.id, commentText.trim());
     setCommentText('');
+  };
+
+  const handleDownload = async (targetFile) => {
+    if (!targetFile?.url) return;
+    setDownloading(true);
+    try {
+      const safeName = targetFile.name || `rabahdj_file_${Date.now()}`;
+      const localUri = FileSystem.cacheDirectory + safeName;
+      const downloadResult = await FileSystem.downloadAsync(targetFile.url, localUri);
+
+      const mimetype = targetFile.mimetype || '';
+      if (mimetype.startsWith('image/') || mimetype.startsWith('video/')) {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          await MediaLibrary.saveToLibraryAsync(downloadResult.uri);
+          Alert.alert('✅ تم الحفظ', 'تم حفظ الملف في معرض الصور والفيديو.');
+        } else {
+          Alert.alert('إذن مطلوب', 'يجب السماح بالوصول لمعرض الصور لحفظ الملف.');
+        }
+      } else {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(downloadResult.uri);
+        } else {
+          Alert.alert('✅ تم التنزيل', `تم حفظ الملف في:\n${downloadResult.uri}`);
+        }
+      }
+    } catch (err) {
+      console.error('خطأ تنزيل الملف:', err);
+      Alert.alert('خطأ', 'تعذّر تنزيل الملف. تأكد من الاتصال بالسيرفر.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -39,9 +110,61 @@ export default function PostCard({ post }) {
       {/* المحتوى النصي */}
       {post.text ? <Text style={styles.contentText}>{post.text}</Text> : null}
 
-      {/* المحتوى الصوري */}
+      {/* صورة المنشور المباشرة (image) */}
       {post.image && !post.image.includes("404") ? (
         <Image source={{ uri: post.image }} style={styles.postImage} resizeMode="cover" />
+      ) : null}
+
+      {/* الملف المرفق (file) */}
+      {file && isImageFile ? (
+        <View>
+          <Image source={{ uri: file.url }} style={styles.postImage} resizeMode="cover" />
+          <TouchableOpacity
+            style={styles.downloadOverlay}
+            onPress={() => handleDownload(file)}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Ionicons name="download-outline" size={18} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : file && isVideoFile ? (
+        <View>
+          <InlineVideoPreview url={file.url} />
+          <TouchableOpacity
+            style={styles.downloadOverlay}
+            onPress={() => handleDownload(file)}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Ionicons name="download-outline" size={18} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : file ? (
+        <View style={styles.fileCard}>
+          <Ionicons name={fileIconFor(file.mimetype)} size={30} color="#3b82f6" />
+          <View style={styles.fileCardInfo}>
+            <Text style={styles.fileCardName} numberOfLines={1}>{file.name}</Text>
+            <Text style={styles.fileCardSize}>{formatFileSize(file.size)}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.fileDownloadBtn}
+            onPress={() => handleDownload(file)}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Ionicons name="download-outline" size={20} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </View>
       ) : null}
 
       {/* أزرار التفاعل */}
@@ -79,7 +202,7 @@ export default function PostCard({ post }) {
         onRequestClose={() => setCommentsVisible(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
           <View style={styles.modalContent}>
@@ -179,6 +302,37 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 10,
     backgroundColor: '#0f172a',
+  },
+  downloadOverlay: {
+    position: 'absolute',
+    bottom: 20,
+    left: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    gap: 10,
+  },
+  fileCardInfo: { flex: 1 },
+  fileCardName: { color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'right' },
+  fileCardSize: { color: '#64748b', fontSize: 12, textAlign: 'right', marginTop: 2 },
+  fileDownloadBtn: {
+    backgroundColor: '#3b82f6',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   footer: {
     flexDirection: 'row-reverse',

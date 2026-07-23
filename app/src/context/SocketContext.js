@@ -48,6 +48,7 @@ export function SocketProvider({ children }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [mySocketId, setMySocketId] = useState(null);
   const [walkieSettings, setWalkieSettings] = useState({ enabled: true, mutedUsers: [] });
+  const [serverIp, setServerIp] = useState(null);
 
   useEffect(() => {
     const loadSaved = async () => {
@@ -69,6 +70,7 @@ export function SocketProvider({ children }) {
       const color = randomColor();
       setUserName(name);
       setAvatarColor(color);
+      setServerIp(ip);
 
       AsyncStorage.setItem("rabahdj_last_name", name).catch(() => {});
       AsyncStorage.setItem("rabahdj_avatar_color", color).catch(() => {});
@@ -158,13 +160,14 @@ export function SocketProvider({ children }) {
     });
   }, []);
 
-  const publishPost = useCallback((text, image = null) => {
-    if (!text?.trim() && !image) return;
+  const publishPost = useCallback((text, image = null, file = null) => {
+    if (!text?.trim() && !image && !file) return;
 
     if (socketRef.current?.connected) {
       socketRef.current.emit("newPost", {
         text: text?.trim() || '',
         image: image || null,
+        file: file || null,
       });
     } else {
       const newPost = {
@@ -173,6 +176,7 @@ export function SocketProvider({ children }) {
         avatarColor: avatarColor,
         text: text?.trim() || '',
         image: image || null,
+        file: file || null,
         likes: [],
         comments: [],
         createdAt: new Date().toISOString(),
@@ -269,6 +273,7 @@ export function SocketProvider({ children }) {
         onlineUsers,
         mySocketId,
         walkieSettings,
+        serverIp,
         socket: socketRef.current,
         connect,
         disconnect,
