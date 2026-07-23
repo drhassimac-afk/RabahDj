@@ -23,15 +23,19 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '26.3.1'  # <--- تطابق كربوني مع جهازك!
+          node-version: '26.3.1'
           cache: 'npm'
           cache-dependency-path: 'app/package-lock.json'
-
 
       - name: 📦 Install Dependencies
         run: |
           cd app
           npm install --legacy-peer-deps
+
+      # --- الإضافة الجديدة للتنظيف العميق ---
+      - name: 🧹 Clean Native Directories
+        run: |
+          rm -rf app/android
 
       - name: 🏗️ Generate Android Folder (Expo Prebuild)
         run: |
@@ -42,19 +46,19 @@ jobs:
         run: |
           cd app/android/app
           sed -i '/^react {/a\    debuggableVariants = []' build.gradle
-          echo "--- محتوى كتلة react بعد التعديل ---"
+          echo "--- تم تطبيق التعديل بنجاح ---"
           grep -A 5 "^react {" build.gradle
 
+      # --- تم إضافة أمر clean هنا لضمان بناء نظيف ---
       - name: 🚀 Build Android Release APK
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
         run: |
           cd app/android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew clean assembleDebug --no-daemon
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RabahDj-App-Release
           path: app/android/app/build/outputs/apk/debug/app-debug.apk
-
