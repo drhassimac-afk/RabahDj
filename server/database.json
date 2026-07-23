@@ -133,7 +133,15 @@
         "r5jL13dLRcrxDkWEAAAd",
         "W8gleSP_3CmMi2aJAAAD"
       ],
-      "comments": [],
+      "comments": [
+        {
+          "id": "1784831521315",
+          "authorName": "Rabah",
+          "avatarColor": "#f97316",
+          "text": "python3 << 'PYEOF'\nwith open('src/context/SocketContext.js', 'r', encoding='utf-8') as f:\n    content = f.read()\n\n# 1. إضافة حالة serverIp\nanchor1 = \"  const [walkieSettings, setWalkieSettings] = useState({ enabled: true, mutedUsers: [] });\"\naddition1 = anchor1 + \"\\n  const [serverIp, setServerIp] = useState(null);\"\nassert content.count(anchor1) == 1\ncontent = content.replace(anchor1, addition1)\n\n# 2. حفظ الـ IP عند الاتصال\nanchor2 = \"\"\"    return new Promise((resolve, reject) => {\n      const color = randomColor();\n      setUserName(name);\n      setAvatarColor(color);\"\"\"\naddition2 = \"\"\"    return new Promise((resolve, reject) => {\n      const color = randomColor();\n      setUserName(name);\n      setAvatarColor(color);\n      setServerIp(ip);\"\"\"\nassert content.count(anchor2) == 1\ncontent = content.replace(anchor2, addition2)\n\n# 3. تعديل publishPost ليقبل ملف مرفق\nanchor3 = \"\"\"  const publishPost = useCallback((text, image = null) => {\n    if (!text?.trim() && !image) return;\n\n    if (socketRef.current?.connected) {\n      socketRef.current.emit(\"newPost\", {\n        text: text?.trim() || '',\n        image: image || null,\n      });\n    } else {\n      const newPost = {\n        id: Date.now().toString(),\n        authorName: userName || 'مستخدم',\n        avatarColor: avatarColor,\n        text: text?.trim() || '',\n        image: image || null,\n        likes: [],\n        comments: [],\n        createdAt: new Date().toISOString(),\n      };\n      setPosts((prev) => [newPost, ...prev]);\n    }\n  }, [userName, avatarColor]);\"\"\"\n\naddition3 = \"\"\"  const publishPost = useCallback((text, image = null, file = null) => {\n    if (!text?.trim() && !image && !file) return;\n\n    if (socketRef.current?.connected) {\n      socketRef.current.emit(\"newPost\", {\n        text: text?.trim() || '',\n        image: image || null,\n        file: file || null,\n      });\n    } else {\n      const newPost = {\n        id: Date.now().toString(),\n        authorName: userName || 'مستخدم',\n        avatarColor: avatarColor,\n        text: text?.trim() || '',\n        image: image || null,\n        file: file || null,\n        likes: [],\n        comments: [],\n        createdAt: new Date().toISOString(),\n      };\n      setPosts((prev) => [newPost, ...prev]);\n    }\n  }, [userName, avatarColor]);\"\"\"\n\nassert content.count(anchor3) == 1, f\"وجدت {content.count(anchor3)} تكرار بدل 1\"\ncontent = content.replace(anchor3, addition3)\n\n# 4. إضافة serverIp لقيمة الـ context\nanchor4 = \"        walkieSettings,\\n        socket: socketRef.current,\"\naddition4 = \"        walkieSettings,\\n        serverIp,\\n        socket: socketRef.current,\"\nassert content.count(anchor4) == 1\ncontent = content.replace(anchor4, addition4)\n\nwith open('src/context/SocketContext.js', 'w', encoding='utf-8') as f:\n    f.write(content)\n\nprint(\"تم بنجاح ✅\")\nPYEOF",
+          "createdAt": "2026-07-23T18:32:01.317Z"
+        }
+      ],
       "createdAt": "2026-07-19T22:16:35.294Z"
     },
     {
