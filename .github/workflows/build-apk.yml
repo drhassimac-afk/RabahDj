@@ -23,7 +23,7 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '26.3.1'
+          node-version: '20.x' # إصدار 26 غير متوفر رسمياً، إصدار 20 يضمن ثبات بناء حزم الـ JavaScript
           cache: 'npm'
           cache-dependency-path: 'app/package-lock.json'
 
@@ -32,8 +32,7 @@ jobs:
           cd app
           npm install --legacy-peer-deps
 
-      # --- الإضافة الجديدة للتنظيف العميق ---
-      - name: 🧹 Clean Native Directories
+      - name: 🧹 Clean Previous Native Directories
         run: |
           rm -rf app/android
 
@@ -42,15 +41,18 @@ jobs:
           cd app
           npx expo prebuild --platform android
 
-      - name: 🛠️ Force JS Bundle Inside Debug APK
+      # خطوة حاسمة: إنشاء مجلد الـ assets للأندرويد مسبقاً لمنع أخطاء الحفظ
+      - name: 📂 Create Android Assets Directory
         run: |
-          cd app/android/app
-          sed -i '/^react {/a\    debuggableVariants = []' build.gradle
-          echo "--- تم تطبيق التعديل بنجاح ---"
-          grep -A 5 "^react {" build.gradle
+          mkdir -p app/android/app/src/main/assets
 
-      # --- تم إضافة أمر clean هنا لضمان بناء نظيف ---
-      - name: 🚀 Build Android Release APK
+      # توليد ملف الـ JS وتضمينه إجبارياً وبشكل صلب داخل نسخة الـ Debug
+      - name: 📦 Force Generate JS Bundle for Debug
+        run: |
+          cd app
+          npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
+      - name: 🚀 Build Android Debug APK (With Injected JS)
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
         run: |
@@ -60,5 +62,5 @@ jobs:
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RabahDj-App-Release
+          name: RabahDj-App-Debug
           path: app/android/app/build/outputs/apk/debug/app-debug.apk
