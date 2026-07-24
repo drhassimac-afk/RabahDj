@@ -141,6 +141,10 @@ export function SocketProvider({ children }) {
         );
       });
 
+      socket.on("postDeleted", ({ postId }) => {
+        setPosts((prev) => prev.filter((p) => p.id !== postId));
+      });
+
       socket.on("onlineUsers", (users) => {
         setOnlineUsers(users);
       });
@@ -239,6 +243,14 @@ export function SocketProvider({ children }) {
   }, [userName, avatarColor]);
 
   // ✅ تفعيل/تعطيل نظام الـ Walkie-Talkie (للأدمن)
+  const deletePost = useCallback((postId) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("deletePost", { postId });
+    } else {
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+    }
+  }, []);
+
   const toggleWalkieSystem = useCallback((enabled) => {
     if (socketRef.current?.connected) {
       socketRef.current.emit("admin_toggle_walkie", { enabled: !!enabled });
@@ -282,6 +294,7 @@ export function SocketProvider({ children }) {
         addComment,
         toggleWalkieSystem,
         muteWalkieUser,
+        deletePost,
       }}
     >
       {children}

@@ -501,6 +501,33 @@ io.on('connection', (socket) => {
         }
     });
 
+    // === حذف منشور (فقط صاحبه) ===
+    socket.on('deletePost', (data) => {
+        if (!isDbReady()) return;
+        try {
+            if (!data?.postId) return;
+
+            const user = activeUsers.get(socket.id);
+            if (!user) return;
+
+            const post = db.get('posts').find({ id: data.postId }).value();
+            if (!post) return;
+
+            // ✅ التحقق أن الطالب هو صاحب المنشور فعلاً
+            if (post.authorName !== user.name) {
+                socket.emit('error', { message: 'لا يمكنك حذف منشور غيرك' });
+                return;
+            }
+
+            db.get('posts').remove({ id: data.postId }).write();
+            io.emit('postDeleted', { postId: data.postId });
+            console.log(`🗑️ تم حذف منشور بواسطة: ${user.name}`);
+        } catch (err) {
+            console.error('خطأ في deletePost:', err);
+        }
+    });
+
+
     // === التالكي ووكي ===
     socket.on('walkie_audio', (data) => {
         const user = activeUsers.get(socket.id);

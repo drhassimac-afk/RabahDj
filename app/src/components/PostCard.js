@@ -37,7 +37,7 @@ function fileIconFor(mimetype) {
 }
 
 export default function PostCard({ post }) {
-  const { toggleLike, addComment, userName, mySocketId } = useRabahSocket();
+  const { toggleLike, addComment, userName, mySocketId, deletePost } = useRabahSocket();
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -57,6 +57,22 @@ export default function PostCard({ post }) {
   const file = post.file || null;
   const isImageFile = file?.mimetype?.startsWith('image/');
   const isVideoFile = file?.mimetype?.startsWith('video/');
+  const isOwner = post.authorName === userName;
+
+  const handleDeletePost = () => {
+    Alert.alert(
+      'حذف المنشور',
+      'هل أنت متأكد من حذف هذا المنشور؟ لا يمكن التراجع.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: () => deletePost(post.id),
+        },
+      ]
+    );
+  };
 
   const handleSendComment = () => {
     if (!commentText.trim()) return;
@@ -105,6 +121,11 @@ export default function PostCard({ post }) {
           <Text style={styles.avatarText}>{initialLetter}</Text>
         </View>
         <Text style={styles.authorName}>{authorName}</Text>
+        {isOwner && (
+          <TouchableOpacity style={styles.deleteBtn} onPress={handleDeletePost}>
+            <Ionicons name="trash-outline" size={18} color="#64748b" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* المحتوى النصي */}
@@ -288,6 +309,10 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     fontWeight: 'bold',
     fontSize: 15,
+    flex: 1,
+  },
+  deleteBtn: {
+    padding: 4,
   },
   contentText: {
     color: '#e2e8f0',
