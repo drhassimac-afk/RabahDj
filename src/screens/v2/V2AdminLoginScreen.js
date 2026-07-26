@@ -1,0 +1,107 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Vibration } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { getSocket, setAdminToken } from '../../api/socket';
+
+const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', danger:'#EF4444', gold:'#FACC15' };
+const KEYS = ['1','2','3','4','5','6','7','8','9','del','0','ok'];
+const LEN = 4;
+
+export default function V2AdminLoginScreen({ navigation }) {
+  const [pin, setPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [lockLeft, setLock] = useState(0);
+  const shake = useRef(new Animated.Value(0)).current;
+  const sock = useRef(getSocket());
+
+  useEffect(() => {
+    const s = sock.current;
+    const onResult = (r) => {
+      setBusy(false);
+      if (r.ok) { setAdminToken(r.token); Vibration.vibrate(40); navigation.replace('V2AdminPanelScreen'); }
+      else if (r.locked) { setLock(r.wait || 300); setError('محاولات كثيرة، انتظر قليلاً'); setPin(''); doShake(); }
+      else { setError('الرمز غير صحيح'); setPin(''); doShake(); }
+    };
+    s.on('admin_login_result', onResult);
+    return () => { s.off('admin_login_result', onResult); };
+  }, []);
+
+  useEffect(() => {
+    if (lockLeft <= 0) return;
+    const t = setInterval(() => setLock(v => (v <= 1 ? 0 : v - 1)), 1000);
+    return () => clearInterval(t);
+  }, [lockLeft]);
+
+  const doShake = () => {
+    Vibration.vibrate(120);
+    Animated.sequence([
+      Animated.timing(shake,{toValue:12,duration:55,useNativeDriver:true}),
+      Animated.timing(shake,{toValue:-12,duration:55,useNativeDriver:true}),
+      Animated.timing(shake,{toValue:8,duration:55,useNativeDriver:true}),
+      Animated.timing(shake,{toValue:0,duration:55,useNativeDriver:true}),
+    ]).start();
+  };
+
+  const submit = (code) => { setBusy(true); setError(''); sock.current.emit('admin_login', { pin: code }); setTimeout(() => setBusy(false), 6000); };
+
+  const press = (k) => {
+    if (busy || lockLeft > 0) return;
+    if (k === 'del') { setPin(p => p.slice(0,-1)); setError(''); return; }
+    if (k === 'ok') { pin.length === LEN && submit(pin); return; }
+    if (pin.length >= LEN) return;
+    const next = pin + k; setPin(next); setError('');
+    if (next.length === LEN) setTimeout(() => submit(next), 150);
+  };
+
+  const mmss = String(Math.floor(lockLeft/60)).padStart(2,'0') + ':' + String(lockLeft%60).padStart(2,'0');
+
+  return (
+    <SafeAreaView style={s.safe}>
+      <TouchableOpacity style={s.back} onPress={() => navigation.goBack()}><Ionicons name="arrow-forward" size={24} color={C.sub} /></TouchableOpacity>
+      <View style={s.top}>
+        <View style={s.shield}><Ionicons name="shield-checkmark" size={44} color={C.gold} /></View>
+        <Text style={s.title}>لوحة الإدارة</Text>
+        <Text style={s.sub}>أدخل رمز الدخول المكوّن من 4 أرقام</Text>
+        <Animated.View style={[s.dots,{transform:[{translateX:shake}]}]}>
+          {Array.from({length:LEN}).map((_,i)=>(
+            <View key={i} style={[s.dot, i<pin.length && {backgroundColor:C.primary,borderColor:C.primary}, !!error && {borderColor:C.danger}]} />
+          ))}
+        </Animated.View>
+        <Text style={[s.msg, lockLeft>0 && {color:C.gold}]}>{lockLeft>0 ? ('🔒 محظور — ' + mmss) : (error || ' ')}</Text>
+      </View>
+      <View style={s.pad}>
+        {KEYS.map(k => {
+          const isAct = k==='ok'||k==='del';
+          const ready = k==='ok' && pin.length===LEN;
+          return (
+            <TouchableOpacity key={k} activeOpacity={0.7} onPress={()=>press(k)} disabled={busy||lockLeft>0}
+              style={[s.key, isAct && {backgroundColor:'transparent',borderColor:'transparent'}, ready && {backgroundColor:C.primary,borderColor:C.primary}]}>
+              {k==='del' ? <Ionicons name="backspace-outline" size={26} color={C.sub} />
+               : k==='ok' ? <Ionicons name="checkmark" size={30} color={ready?'#fff':C.border} />
+               : <Text style={s.keyTxt}>{k}</Text>}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <Text style={s.hint}>الرمز الافتراضي 1234 — غيّره فور الدخول</Text>
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  safe:{flex:1,backgroundColor:C.bg,paddingHorizontal:20},
+  back:{alignSelf:'flex-end',padding:8,marginTop:4},
+  top:{alignItems:'center',marginTop:10},
+  shield:{width:88,height:88,borderRadius:26,backgroundColor:'#2A2410',alignItems:'center',justifyContent:'center',marginBottom:18},
+  title:{color:C.text,fontSize:24,fontWeight:'800'},
+  sub:{color:C.sub,fontSize:14,marginTop:6},
+  dots:{flexDirection:'row',marginTop:28},
+  dot:{width:18,height:18,borderRadius:9,borderWidth:2,borderColor:C.border,marginHorizontal:9},
+  msg:{color:C.danger,fontSize:13,marginTop:16,height:20,fontWeight:'600'},
+  pad:{flexDirection:'row-reverse',flexWrap:'wrap',justifyContent:'center',marginTop:24},
+  key:{width:76,height:76,borderRadius:38,margin:9,backgroundColor:C.surface,borderWidth:1,borderColor:C.border,alignItems:'center',justifyContent:'center'},
+  keyTxt:{color:C.text,fontSize:26,fontWeight:'700'},
+  hint:{color:'#64748B',fontSize:12,textAlign:'center',marginTop:'auto',marginBottom:14},
+});
