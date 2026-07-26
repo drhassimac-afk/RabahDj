@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSocket } from '../../api/socket';
+import { SERVER_URL } from '../../api/config';
 
 const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', success:'#22C55E', danger:'#EF4444', gold:'#FACC15', live:'#A855F7', elevated:'#1E2A3D' };
 
@@ -52,7 +53,7 @@ export default function V2LoginScreen({ navigation }) {
       <View style={s.field}><TextInput style={s.input} placeholder="اسمك" placeholderTextColor={C.muted} value={name} onChangeText={setName} autoCapitalize="none" returnKeyType="done" /></View>
       {!!msg && <Text style={s.err}>{msg}</Text>}
       <TouchableOpacity style={s.btn} onPress={join} disabled={status==='connecting'} activeOpacity={0.85}>{status==='connecting' ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>دخول</Text>}</TouchableOpacity>
-      <Text style={s.note2}>السيرفر: 10.124.53.98:4000</Text>
+      <Text style={s.note2}>السيرفر: {SERVER_URL.replace('http://', '')}</Text>
     </SafeAreaView>
   );
 }
