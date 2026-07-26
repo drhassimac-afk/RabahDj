@@ -1,27 +1,53 @@
 {
   "name": "rabahdj",
   "version": "1.0.0",
-  "description": "شبكة اجتماعية محلية بتصميم احترافي يشبه فيسبوك، تعمل بالكامل عبر شبكة **واي فاي محلية بدون إنترنت**. الأجهزة المتصلة بنفس الشبكة تتبادل المنشورات والإعجابات والتعليقات في الوقت الفعلي.",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "postinstall": "bash ./scripts_postinstall_clean.sh"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://TOKEN_%D8%A7%D9%84%D8%AC%D8%AF%D9%8A%D8%AF_%D9%87%D9%86%D8%A7@github.com/drhassimac-afk/RabahDj.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/drhassimac-afk/RabahDj/issues"
-  },
-  "homepage": "https://github.com/drhassimac-afk/RabahDj#readme",
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "multer": "^2.2.0",
-    "socket.io": "^4.8.3"
+    "@config-plugins/react-native-webrtc": "^13.0.0",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/stack": "^6.4.1",
+    "expo": "~54.0.0",
+    "expo-av": "~16.0.8",
+    "expo-build-properties": "~1.0.10",
+    "expo-document-picker": "~14.0.8",
+    "expo-file-system": "~19.0.23",
+    "expo-image-picker": "~17.0.11",
+    "expo-media-library": "~18.2.1",
+    "expo-secure-store": "~15.0.8",
+    "expo-sharing": "~14.0.8",
+    "expo-status-bar": "~3.0.9",
+    "expo-video": "~3.0.16",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-webrtc": "^124.0.8",
+    "react-native-webview": "13.15.0",
+    "react-native-worklets": "0.5.1",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "babel-preset-expo": "54.0.10"
+  },
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-webrtc"
+        ]
+      }
+    }
   }
 }
