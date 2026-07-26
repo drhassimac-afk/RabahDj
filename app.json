@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "rabahdj",
-    "slug": "RabahDj",
+    "slug": "RabahDjNew",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -46,8 +46,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "e556e8eb-cf64-49da-ba01-82523e535fc0"
+        "projectId": "0f7210ea-9733-4d38-9061-83fb4ac91d9e"
       }
-    }
+    },
+    "owner": "rabahdj-new"
   }
 }

@@ -26,16 +26,12 @@ export default function V2WelcomeScreen({ navigation }) {
 
   const soon = (label) => { Vibration.vibrate(40); Alert.alert(label, 'هذه الميزة قيد التطوير وستفعّل قريبًا 🔧'); };
 
-  const FEATURES = [ { icon:'videocam', label:'بث مباشر', color:C.live, bg:C.liveBg, onPress:()=>navigation.navigate('LiveStream') }, { icon:'film', label:'سينما وتلفاز', color:'#E11D48', bg:'#4C0519', onPress:()=>navigation.navigate('Cinema') }, { icon:'game-controller', label:'ألعاب محلية', color:C.games, bg:C.gamesBg, onPress:()=>navigation.navigate('Games') }, { icon:'chatbubbles', label:'محادثات فورية', color:C.chat, bg:C.chatBg, onPress:()=>navigation.navigate('V2LoginScreen') }, ]; // 
-    { icon:'videocam', label:'بث مباشر', color:C.live, bg:C.liveBg, onPress:()=>navigation.navigation.navigation.navigate('LiveStream') },
-    { icon:'film', label:'سينما وتلفاز', color:'#E11D48', bg:'#4C0519', onPress:()=>navigation.navigate('V2CinemaScreen') },
-    { icon:'game-controller', label:'ألعاب محلية', color:C.games, bg:C.gamesBg, onPress:()=>navigation.navigate('V2GamesScreen') },
-    { icon:'chatbubbles', label:'محادثات فورية', color:C.chat, bg:C.chatBg, onPress:()=>navigation.navigate('V2LoginScreen') },
-    // 
-    { icon:'videocam',        label:'بث مباشر',     color:C.live,   bg:C.liveBg,   onPress:()=>navigation.navigation.navigation.navigate('LiveStream') },
+  const FEATURES = [
+    { icon:'videocam',        label:'بث مباشر',     color:C.live,   bg:C.liveBg,   onPress:()=>navigation.navigate('LiveStream') },
+    { icon:'film',            label:'سينما وتلفاز', color:'#E11D48', bg:'#4C0519', onPress:()=>navigation.navigate('V2CinemaScreen') },
     { icon:'mic',             label:'تخاطب لاسلكي', color:C.walkie, bg:C.walkieBg, onPress:()=>navigation.navigate('Walkie') },
     { icon:'chatbubbles',     label:'محادثات فورية',color:C.chat,   bg:C.chatBg,   onPress:()=>navigation.navigate('V2LoginScreen') },
-    { icon:'game-controller', label:'ألعاب محلية',  color:C.games,  bg:C.gamesBg,  onPress:()=>navigation.navigate('Games') },
+    { icon:'game-controller', label:'ألعاب محلية',  color:C.games,  bg:C.gamesBg,  onPress:()=>navigation.navigate('V2GamesScreen') },
   ];
 
   return (
