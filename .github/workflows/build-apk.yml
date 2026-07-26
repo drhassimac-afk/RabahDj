@@ -23,24 +23,18 @@ jobs:
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '26.3.1'  # <--- تطابق كربوني مع جهازك!
+          node-version: '20'
           cache: 'npm'
-          cache-dependency-path: 'app/package-lock.json'
-
 
       - name: 📦 Install Dependencies
-        run: |
-          cd app
-          npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: 🏗️ Generate Android Folder (Expo Prebuild)
-        run: |
-          cd app
-          npx expo prebuild --platform android
+        run: npx expo prebuild --platform android
 
       - name: 🛠️ Force JS Bundle Inside Debug APK
         run: |
-          cd app/android/app
+          cd android/app
           sed -i '/^react {/a\    debuggableVariants = []' build.gradle
           echo "--- محتوى كتلة react بعد التعديل ---"
           grep -A 5 "^react {" build.gradle
@@ -49,11 +43,11 @@ jobs:
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
         run: |
-          cd app/android
+          cd android
           ./gradlew assembleDebug --no-daemon
 
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RabahDj-App-Release
-          path: app/android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
