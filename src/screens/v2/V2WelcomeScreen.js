@@ -28,10 +28,10 @@ export default function V2WelcomeScreen({ navigation }) {
 
   const FEATURES = [
     { icon:'videocam',        label:'بث مباشر',     color:C.live,   bg:C.liveBg,   onPress:()=>navigation.navigate('LiveStream') },
-    { icon:'film',            label:'سينما وتلفاز', color:'#E11D48', bg:'#4C0519', onPress:()=>navigation.navigate('V2CinemaScreen') },
+    { icon:'film',            label:'سينما وتلفاز', color:'#E11D48', bg:'#4C0519', onPress:()=>navigation.navigate('Cinema') },
     { icon:'mic',             label:'تخاطب لاسلكي', color:C.walkie, bg:C.walkieBg, onPress:()=>navigation.navigate('Walkie') },
     { icon:'chatbubbles',     label:'محادثات فورية',color:C.chat,   bg:C.chatBg,   onPress:()=>navigation.navigate('V2LoginScreen') },
-    { icon:'game-controller', label:'ألعاب محلية',  color:C.games,  bg:C.gamesBg,  onPress:()=>navigation.navigate('V2GamesScreen') },
+    { icon:'game-controller', label:'ألعاب محلية',  color:C.games,  bg:C.gamesBg,  onPress:()=>navigation.navigate('Games') },
   ];
 
   return (
