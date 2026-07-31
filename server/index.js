@@ -367,6 +367,8 @@ app.get('/', (req, res) => {
 // ========================================
 // Socket.io - معالجة الاتصالات
 // ========================================
+if (!global.adminPin) { global.adminPin = '1234'; }
+
 io.on('connection', (socket) => {
     console.log(`🔌 جهاز جديد اتصل: ${socket.id}`);
 
@@ -412,7 +414,7 @@ io.on('connection', (socket) => {
     // === تسجيل دخول الإدارة ===
     socket.on('admin_login', (data) => {
         const pin = data && data.pin;
-        if (pin === '1234') {
+        if (pin === (global.adminPin || '1234')) {
             const token = Math.random().toString(36).slice(2) + Date.now();
             socket.emit('admin_login_result', { ok: true, token });
             console.log('🔐 دخول إداري ناجح');
@@ -420,6 +422,22 @@ io.on('connection', (socket) => {
             socket.emit('admin_login_result', { ok: false });
             console.log('🔐 محاولة دخول إداري فاشلة');
         }
+    });
+
+    // === تغيير رمز الإدارة ===
+    socket.on('admin_change_pin', (data) => {
+        const { oldPin, newPin } = data || {};
+        if (oldPin !== global.adminPin) {
+            socket.emit('admin_change_pin_result', { ok: false, message: 'الرمز الحالي غير صحيح' });
+            return;
+        }
+        if (!newPin || newPin.length < 4 || newPin.length > 8) {
+            socket.emit('admin_change_pin_result', { ok: false, message: 'الرمز الجديد يجب أن يكون بين 4 و8 أرقام' });
+            return;
+        }
+        global.adminPin = newPin;
+        socket.emit('admin_change_pin_result', { ok: true });
+        console.log('🔐 تم تغيير رمز الإدارة');
     });
 
     // === نشر منشور جديد ===
