@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import V2WelcomeScreen from './src/screens/v2/V2WelcomeScreen';
+import MainTabs from './src/navigation/MainTabs';
 import V2LoginScreen from './src/screens/v2/V2LoginScreen';
 import V2AdminLoginScreen from './src/screens/v2/V2AdminLoginScreen';
 import V2AdminPanelScreen from './src/screens/v2/V2AdminPanelScreen';
@@ -21,8 +22,8 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer theme={DarkTheme}>
-        <Stack.Navigator initialRouteName="V2WelcomeScreen" screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="V2WelcomeScreen" component={V2WelcomeScreen} />
+        <Stack.Navigator initialRouteName="MainTabs" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="V2LoginScreen" component={V2LoginScreen} />
           <Stack.Screen name="V2AdminLoginScreen" component={V2AdminLoginScreen} />
           <Stack.Screen name="V2AdminPanelScreen" component={V2AdminPanelScreen} />
@@ -32,7 +33,6 @@ export default function App() {
           <Stack.Screen name="Cinema" component={V2CinemaScreen} />
           <Stack.Screen name="Games" component={V2GamesScreen} />
           <Stack.Screen name="Files" component={FileShareScreen} />
-          <Stack.Screen name="Notifications" component={V2NotificationsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
