@@ -11,6 +11,7 @@ export default function V2LoginScreen({ navigation }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState('idle');
   const [msg, setMsg] = useState('');
+  const [initData, setInitData] = useState({});
   const sock = useRef(getSocket());
 
   const join = () => {
@@ -18,7 +19,7 @@ export default function V2LoginScreen({ navigation }) {
     if (!n) { setMsg('أدخل اسمك أولاً'); Vibration.vibrate(60); return; }
     setStatus('connecting'); setMsg('');
     const s = sock.current;
-    const onUsersList = () => { setStatus('connected'); s.off('init', onUsersList); s.off('error', onErr); };
+    const onUsersList = (data) => { setStatus('connected'); setInitData(data || {}); s.off('init', onUsersList); s.off('error', onErr); };
     const onErr = (e) => { setStatus('error'); setMsg((e && e.message) || 'فشل الاتصال'); s.off('init', onUsersList); s.off('error', onErr); };
     s.off('init'); s.off('error');
     s.on('init', onUsersList); s.on('error', onErr);
@@ -34,7 +35,7 @@ export default function V2LoginScreen({ navigation }) {
           <View style={s.okIcon}><Ionicons name="checkmark-circle" size={60} color={C.success} /></View>
           <Text style={s.title}>تم الدخول</Text>
           <Text style={s.sub}>مرحبًا {name} 👋</Text>
-          <TouchableOpacity style={s.btn} onPress={() => navigation.navigate('Wall', { name })}><Ionicons name="newspaper" size={20} color="#fff" style={{ marginLeft:8 }} /><Text style={s.btnTxt}>الحائط</Text></TouchableOpacity>
+          <TouchableOpacity style={s.btn} onPress={() => navigation.navigate('Wall', { name, initialPosts: initData.posts })}><Ionicons name="newspaper" size={20} color="#fff" style={{ marginLeft:8 }} /><Text style={s.btnTxt}>الحائط</Text></TouchableOpacity>
           <TouchableOpacity style={[s.btn, { backgroundColor:'#2A1B3D', marginTop:12 }]} onPress={() => navigation.navigate('Files', { name })}><Ionicons name="paper-plane" size={20} color={C.live} style={{ marginLeft:8 }} /><Text style={[s.btnTxt, { color:C.live }]}>مشاركة الملفات</Text></TouchableOpacity>
           <TouchableOpacity style={[s.btn, { backgroundColor:C.elevated, marginTop:12 }]} onPress={() => navigation.navigate('V2AdminLoginScreen')}><Ionicons name="shield-checkmark" size={20} color={C.gold} style={{ marginLeft:8 }} /><Text style={[s.btnTxt, { color:C.gold }]}>لوحة الإدارة</Text></TouchableOpacity>
         </View>

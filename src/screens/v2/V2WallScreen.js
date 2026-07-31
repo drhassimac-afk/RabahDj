@@ -21,7 +21,7 @@ const C = {
 
 export default function V2WallScreen({ route, navigation }) {
   const myName = route?.params?.name || '';
-  const [posts, setPosts] = useState([]);
+  const [posts, setPosts] = useState(route?.params?.initialPosts || []);
   const [text, setText] = useState('');
   const sock = useRef(getSocket());
 
@@ -35,29 +35,27 @@ export default function V2WallScreen({ route, navigation }) {
     const onPostDeleted = ({ postId }) =>
       setPosts((prev) => prev.filter((p) => p.id !== postId));
 
-    s.on('posts_list', onPostsList);
-    s.on('post_added', onPostAdded);
-    s.on('post_updated', onPostUpdated);
-    s.on('post_deleted', onPostDeleted);
+        s.on('postAdded', onPostAdded);
+    s.on('postUpdated', onPostUpdated);
+    s.on('postDeleted', onPostDeleted);
 
     return () => {
-      s.off('posts_list', onPostsList);
-      s.off('post_added', onPostAdded);
-      s.off('post_updated', onPostUpdated);
-      s.off('post_deleted', onPostDeleted);
+      s.off('postAdded', onPostAdded);
+      s.off('postUpdated', onPostUpdated);
+      s.off('postDeleted', onPostDeleted);
     };
   }, []);
 
   const publish = () => {
     const t = text.trim();
     if (!t) return;
-    sock.current.emit('new_post', { text: t });
+    sock.current.emit('newPost', { text: t });
     setText('');
   };
 
-  const toggleLike = (postId) => sock.current.emit('toggle_like', { postId });
+  const toggleLike = (postId) => sock.current.emit('toggleLike', { postId });
 
-  const deletePost = (postId) => sock.current.emit('delete_post', { postId });
+  const deletePost = (postId) => sock.current.emit('deletePost', { postId });
 
   const renderPost = ({ item }) => {
     const isMine = item.authorName === myName;
