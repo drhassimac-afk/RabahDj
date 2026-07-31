@@ -18,10 +18,10 @@ export default function V2LoginScreen({ navigation }) {
     if (!n) { setMsg('أدخل اسمك أولاً'); Vibration.vibrate(60); return; }
     setStatus('connecting'); setMsg('');
     const s = sock.current;
-    const onUsersList = () => { setStatus('connected'); s.off('users_list', onUsersList); s.off('error', onErr); };
-    const onErr = (e) => { setStatus('error'); setMsg((e && e.message) || 'فشل الاتصال'); s.off('users_list', onUsersList); s.off('error', onErr); };
-    s.off('users_list'); s.off('error');
-    s.on('users_list', onUsersList); s.on('error', onErr);
+    const onUsersList = () => { setStatus('connected'); s.off('init', onUsersList); s.off('error', onErr); };
+    const onErr = (e) => { setStatus('error'); setMsg((e && e.message) || 'فشل الاتصال'); s.off('init', onUsersList); s.off('error', onErr); };
+    s.off('init'); s.off('error');
+    s.on('init', onUsersList); s.on('error', onErr);
     const doJoin = () => s.emit('join', { name: n, avatarColor: C.primary });
     if (!s.connected) { s.once('connect', doJoin); s.once('connect_error', () => { setStatus('error'); setMsg('تعذّر الوصول للسيرفر المحلي'); }); }
     else doJoin();
