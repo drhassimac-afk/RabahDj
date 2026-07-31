@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Vibration, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getNotifications, subscribe } from '../../api/notifications';
 
 const C = {
   bg:'#0B1120', primary:'#3B82F6', primarySoft:'#1E3A5F',
@@ -13,6 +14,8 @@ const C = {
 };
 
 export default function V2WelcomeScreen({ navigation }) {
+  const [notifCount, setNotifCount] = React.useState(getNotifications().length);
+  React.useEffect(() => { const unsub = subscribe((items) => setNotifCount(items.length)); return unsub; }, []);
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -32,6 +35,7 @@ export default function V2WelcomeScreen({ navigation }) {
     { icon:'mic',             label:'تخاطب لاسلكي', color:C.walkie, bg:C.walkieBg, onPress:()=>navigation.navigate('Walkie') },
     { icon:'chatbubbles',     label:'محادثات فورية',color:C.chat,   bg:C.chatBg,   onPress:()=>navigation.navigate('V2LoginScreen') },
     { icon:'game-controller', label:'ألعاب محلية',  color:C.games,  bg:C.gamesBg,  onPress:()=>navigation.navigate('Games') },
+    { icon:'notifications',  label:'الإشعارات',    color:'#FACC15', bg:'#3D2E0A',  onPress:()=>navigation.navigate('Notifications'), badge: notifCount },
   ];
 
   return (
@@ -49,7 +53,12 @@ export default function V2WelcomeScreen({ navigation }) {
         <View style={s.grid}>
           {FEATURES.map(f => (
             <TouchableOpacity key={f.label} style={s.cell} activeOpacity={0.7} onPress={f.onPress}>
-              <View style={[s.tile,{backgroundColor:f.bg}]}><Ionicons name={f.icon} size={30} color={f.color} /></View>
+              <View style={[s.tile,{backgroundColor:f.bg}]}>
+                <Ionicons name={f.icon} size={30} color={f.color} />
+                {!!f.badge && (
+                  <View style={s.badge}><Text style={s.badgeTxt}>{f.badge > 9 ? '9+' : f.badge}</Text></View>
+                )}
+              </View>
               <Text style={s.cellLbl}>{f.label}</Text>
             </TouchableOpacity>
           ))}
@@ -90,4 +99,6 @@ const s = StyleSheet.create({
   btnTxt:{color:'#fff',fontSize:17,fontWeight:'700',marginLeft:8},
   adminLink:{color:C.muted,fontSize:12,textAlign:'center'},
   ver:{color:C.muted,fontSize:12,textAlign:'center',marginTop:10},
+  badge:{position:'absolute',top:-4,right:-4,backgroundColor:'#EF4444',borderRadius:10,minWidth:20,height:20,alignItems:'center',justifyContent:'center',paddingHorizontal:4},
+  badgeTxt:{color:'#fff',fontSize:11,fontWeight:'800'},
 });
