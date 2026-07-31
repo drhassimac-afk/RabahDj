@@ -409,6 +409,19 @@ io.on('connection', (socket) => {
         socket.emit('walkie_settings_update', walkieSettings);
     });
 
+    // === تسجيل دخول الإدارة ===
+    socket.on('admin_login', (data) => {
+        const pin = data && data.pin;
+        if (pin === '1234') {
+            const token = Math.random().toString(36).slice(2) + Date.now();
+            socket.emit('admin_login_result', { ok: true, token });
+            console.log('🔐 دخول إداري ناجح');
+        } else {
+            socket.emit('admin_login_result', { ok: false });
+            console.log('🔐 محاولة دخول إداري فاشلة');
+        }
+    });
+
     // === نشر منشور جديد ===
     socket.on('newPost', (data) => {
         if (!isDbReady()) return;
