@@ -368,6 +368,7 @@ app.get('/', (req, res) => {
 // Socket.io - معالجة الاتصالات
 // ========================================
 if (!global.adminPin) { global.adminPin = '1234'; }
+if (!global.xoState) { global.xoState = { board: Array(9).fill(null), turn: 'X', winner: null, players: {} }; }
 
 io.on('connection', (socket) => {
     console.log(`🔌 جهاز جديد اتصل: ${socket.id}`);
@@ -438,6 +439,44 @@ io.on('connection', (socket) => {
         global.adminPin = newPin;
         socket.emit('admin_change_pin_result', { ok: true });
         console.log('🔐 تم تغيير رمز الإدارة');
+    });
+
+    // === لعبة إكس أو ===
+    function xoWinner(b) {
+        const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        for (const [a,b1,c] of lines) {
+            if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
+        }
+        return b.every(x => x) ? 'draw' : null;
+    }
+
+    socket.emit('xo_state', global.xoState);
+
+    socket.on('xo_join', () => {
+        const st = global.xoState;
+        if (!st.players.X) st.players.X = socket.id;
+        else if (!st.players.O && st.players.X !== socket.id) st.players.O = socket.id;
+        io.emit('xo_state', st);
+    });
+
+    socket.on('xo_move', (data) => {
+        const st = global.xoState;
+        const i = data && data.index;
+        if (i === undefined || i < 0 || i > 8) return;
+        if (st.winner || st.board[i]) return;
+        const mySymbol = st.players.X === socket.id ? 'X' : st.players.O === socket.id ? 'O' : null;
+        if (!mySymbol || mySymbol !== st.turn) return;
+        st.board[i] = mySymbol;
+        st.winner = xoWinner(st.board);
+        st.turn = st.turn === 'X' ? 'O' : 'X';
+        io.emit('xo_state', st);
+    });
+
+    socket.on('xo_reset', () => {
+        global.xoState.board = Array(9).fill(null);
+        global.xoState.turn = 'X';
+        global.xoState.winner = null;
+        io.emit('xo_state', global.xoState);
     });
 
     // === نشر منشور جديد ===
