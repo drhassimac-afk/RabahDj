@@ -36,11 +36,13 @@ export default function V2WelcomeScreen({ navigation }) {
     { icon:'chatbubbles',     label:'محادثات فورية',color:C.chat,   bg:C.chatBg,   onPress:()=>navigation.navigate('V2LoginScreen') },
     { icon:'game-controller', label:'ألعاب محلية',  color:C.games,  bg:C.gamesBg,  onPress:()=>navigation.navigate('Games') },
     { icon:'notifications',  label:'الإشعارات',    color:'#FACC15', bg:'#3D2E0A',  onPress:()=>navigation.navigate('Notifications'), badge: notifCount },
+    { icon:'folder-open',    label:'مشاركة ملفات', color:'#A855F7', bg:'#2A1B3D',  onPress:()=>navigation.navigate('Files') },
+    { icon:'location',       label:'قريبون مني',   color:'#22C55E', bg:'#0F3B2A',  onPress:()=>navigation.navigate('Nearby') },
   ];
 
   return (
     <SafeAreaView style={s.safe}>
-      <ScrollView contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
         <View style={s.logoBox}>
           <Animated.View style={[s.ring,{transform:[{scale}],opacity:op}]} />
           <View style={s.outer}><View style={s.inner}><Ionicons name="radio" size={64} color={C.primary} /></View></View>

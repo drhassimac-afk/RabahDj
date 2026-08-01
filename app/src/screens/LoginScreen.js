@@ -4,7 +4,7 @@ import { SocketContext } from '../context/SocketContext';
 
 export default function LoginScreen({ navigation }) {
   const { connect } = useContext(SocketContext);
-  const [ip, setIp] = useState('');
+  const [ip, setIp] = useState('127.0.0.1');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
