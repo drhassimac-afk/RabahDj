@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Vibration, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Vibration, Animated, Easing, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, subscribe } from '../../api/notifications';
@@ -40,7 +40,7 @@ export default function V2WelcomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.safe}>
-      <View style={s.body}>
+      <ScrollView contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
         <View style={s.logoBox}>
           <Animated.View style={[s.ring,{transform:[{scale}],opacity:op}]} />
           <View style={s.outer}><View style={s.inner}><Ionicons name="radio" size={64} color={C.primary} /></View></View>
@@ -63,7 +63,7 @@ export default function V2WelcomeScreen({ navigation }) {
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      </ScrollView>
 
       <View style={s.footer}>
         <TouchableOpacity style={s.btn} activeOpacity={0.85} onPress={()=>navigation.navigate('V2LoginScreen')}>
@@ -81,7 +81,7 @@ export default function V2WelcomeScreen({ navigation }) {
 
 const s = StyleSheet.create({
   safe:{flex:1,backgroundColor:C.bg},
-  body:{flex:1,alignItems:'center',justifyContent:'center',paddingHorizontal:20},
+  body:{alignItems:'center',paddingHorizontal:20,paddingTop:10,paddingBottom:20},
   logoBox:{width:170,height:170,alignItems:'center',justifyContent:'center'},
   ring:{position:'absolute',width:170,height:170,borderRadius:85,backgroundColor:C.primary},
   outer:{width:150,height:150,borderRadius:75,backgroundColor:C.primarySoft,alignItems:'center',justifyContent:'center'},

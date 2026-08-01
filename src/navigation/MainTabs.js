@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import V2WelcomeScreen from '../screens/v2/V2WelcomeScreen';
 import V2NotificationsScreen from '../screens/v2/V2NotificationsScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import ProfileScreen from '../screens/v2/V2ProfileScreen';
 import V2SettingsScreen from '../screens/v2/V2SettingsScreen';
 import { getNotifications, subscribe } from '../api/notifications';
 

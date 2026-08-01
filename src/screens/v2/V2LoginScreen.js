@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSocket } from '../../api/socket';
 import { SERVER_URL } from '../../api/config';
+import { setCurrentUser } from '../../api/currentUser';
 
 const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', success:'#22C55E', danger:'#EF4444', gold:'#FACC15', live:'#A855F7', elevated:'#1E2A3D' };
 
@@ -17,6 +18,7 @@ export default function V2LoginScreen({ navigation }) {
   const join = () => {
     const n = name.trim();
     if (!n) { setMsg('أدخل اسمك أولاً'); Vibration.vibrate(60); return; }
+    setCurrentUser(n);
     setStatus('connecting'); setMsg('');
     const s = sock.current;
     const onUsersList = (data) => { setStatus('connected'); setInitData(data || {}); s.off('init', onUsersList); s.off('error', onErr); };
