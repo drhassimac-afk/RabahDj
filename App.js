@@ -16,9 +16,6 @@ import V2GamesScreen from './src/screens/v2/V2GamesScreen';
 import FileShareScreen from './src/screens/v2/FileShareScreen';
 import V2NotificationsScreen from './src/screens/v2/V2NotificationsScreen';
 import V2NearbyScreen from './src/screens/v2/V2NearbyScreen';
-import V2NearbyScreen from './src/screens/v2/V2NearbyScreen';
-import V2NearbyScreen from './src/screens/v2/V2NearbyScreen';
-import V2NearbyScreen from './src/screens/v2/V2NearbyScreen';
 
 const Stack = createStackNavigator();
 
