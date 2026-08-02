@@ -1,106 +1,677 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
-const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8' };
+import {
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-const SAMPLE_A = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-const SAMPLE_B = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4';
+import {
+  Ionicons,
+} from '@expo/vector-icons';
 
-const ITEMS = [
-  { id:'1', title:'فيلم الخيال', genre:'خيال علمي', dur:'2h 10m', emoji:'🚀', color:'#2E3A6B', cat:'أفلام', video:SAMPLE_A },
-  { id:'2', title:'الأبطال',     genre:'أكشن',       dur:'2h 5m',  emoji:'⚡', color:'#6B5B1E', cat:'أفلام', video:SAMPLE_B },
-  { id:'3', title:'كوميديا',     genre:'كوميدي',      dur:'1h 20m', emoji:'😂', color:'#5B2E6B', cat:'أفلام', video:SAMPLE_A },
-  { id:'4', title:'مسلسل العائلة', genre:'دراما',     dur:'45 دقيقة', emoji:'🎭', color:'#6B2E2E', cat:'مسلسلات', video:SAMPLE_B },
-  { id:'5', title:'ليالي الحي', genre:'دراما',        dur:'50 دقيقة', emoji:'🌙', color:'#2E4A6B', cat:'مسلسلات', video:SAMPLE_A },
-  { id:'6', title:'الطبيعة',    genre:'وثائقي',       dur:'1h 30m', emoji:'🦁', color:'#1E6B3A', cat:'وثائقي', video:SAMPLE_B },
-  { id:'7', title:'الفضاء',     genre:'مغامرة',       dur:'1h 50m', emoji:'🛰️', color:'#1E4A6B', cat:'وثائقي', video:SAMPLE_A },
+import {
+  useVideoPlayer,
+  VideoView,
+} from 'expo-video';
+
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+
+import {
+  SERVER_URL,
+} from '../../api/config';
+
+const { width } = Dimensions.get('window');
+
+const C = {
+  bg: '#0B1120',
+  surface: '#161F2E',
+  border: '#243044',
+  primary: '#3B82F6',
+  text: '#FFFFFF',
+  sub: '#94A3B8',
+  muted: '#64748B',
+  danger: '#EF4444',
+};
+
+const SAMPLE_A =
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
+const SAMPLE_B =
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4';
+
+const DEMO_ITEMS = [
+  {
+    id: 'demo-1',
+    title: 'Big Buck Bunny - تجريبي',
+    genre: 'رسوم متحركة',
+    duration: 'تجريبي',
+    category: 'أفلام',
+    emoji: '🎬',
+    color: '#2E3A6B',
+    video: SAMPLE_A,
+  },
+  {
+    id: 'demo-2',
+    title: 'Elephants Dream - تجريبي',
+    genre: 'خيال',
+    duration: 'تجريبي',
+    category: 'أفلام',
+    emoji: '🎞️',
+    color: '#6B5B1E',
+    video: SAMPLE_B,
+  },
 ];
 
-const CATS = ['الكل', 'أفلام', 'مسلسلات', 'وثائقي'];
+const CATEGORIES = [
+  'الكل',
+  'أفلام',
+  'كوميديا',
+  'مسلسلات',
+  'وثائقي',
+];
+
+function getCategory(fileName) {
+  const name = fileName.toLowerCase();
+
+  if (
+    name.includes('comedy') ||
+    name.includes('comedic') ||
+    name.includes('k comedy') ||
+    name.includes('كوميديا') ||
+    name.includes('ضحك')
+  ) {
+    return 'كوميديا';
+  }
+
+  if (
+    name.includes('series') ||
+    name.includes('episode') ||
+    name.includes('مسلسل') ||
+    name.includes('حلقة')
+  ) {
+    return 'مسلسلات';
+  }
+
+  if (
+    name.includes('documentary') ||
+    name.includes('document') ||
+    name.includes('doc_') ||
+    name.includes('وثائقي')
+  ) {
+    return 'وثائقي';
+  }
+
+  return 'أفلام';
+}
+
+function getEmoji(category) {
+  if (category === 'كوميديا') {
+    return '😂';
+  }
+
+  if (category === 'مسلسلات') {
+    return '🎭';
+  }
+
+  if (category === 'وثائقي') {
+    return '🌍';
+  }
+
+  return '🎬';
+}
+
+function getColor(category) {
+  if (category === 'كوميديا') {
+    return '#5B2E6B';
+  }
+
+  if (category === 'مسلسلات') {
+    return '#6B2E2E';
+  }
+
+  if (category === 'وثائقي') {
+    return '#1E6B3A';
+  }
+
+  return '#2E4A6B';
+}
+
+function getTitle(fileName) {
+  return fileName
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+}
+
+function normalizeServerFiles(data) {
+  const files = Array.isArray(data)
+    ? data
+    : data?.files || data?.media || [];
+
+  return files
+    .map((file, index) => {
+      const fileName =
+        typeof file === 'string'
+          ? file
+          : file?.name ||
+            file?.filename ||
+            file?.file;
+
+      if (!fileName) {
+        return null;
+      }
+
+      const category = getCategory(fileName);
+
+      return {
+        id: `server-${fileName}-${index}`,
+        title: getTitle(fileName),
+        genre: category,
+        duration: 'من الشبكة',
+        category,
+        emoji: getEmoji(category),
+        color: getColor(category),
+
+        // نبني الرابط من SERVER_URL حتى لا نستخدم IP خاطئًا
+        video:
+          `${SERVER_URL}/media/` +
+          encodeURIComponent(fileName),
+
+        remote: true,
+      };
+    })
+    .filter(Boolean);
+}
 
 function PlayerModal({ item, onClose }) {
-  const player = useVideoPlayer(item.video, (p) => { p.play(); });
+  const player = useVideoPlayer(
+    item.video,
+    (videoPlayer) => {
+      videoPlayer.play();
+    }
+  );
+
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={p.container}>
-        <TouchableOpacity style={p.closeBtn} onPress={onClose}>
-          <Ionicons name="close-circle" size={36} color="#fff" />
+    <Modal
+      visible
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={playerStyles.container}>
+        <TouchableOpacity
+          style={playerStyles.closeButton}
+          onPress={onClose}
+        >
+          <Ionicons
+            name="close-circle"
+            size={38}
+            color="#FFFFFF"
+          />
         </TouchableOpacity>
-        <VideoView style={p.video} player={player} allowsFullscreen allowsPictureInPicture />
-        <Text style={p.title}>{item.title}</Text>
+
+        <VideoView
+          style={playerStyles.video}
+          player={player}
+          nativeControls
+          contentFit="contain"
+          allowsFullscreen
+          allowsPictureInPicture
+        />
+
+        <Text style={playerStyles.title}>
+          {item.title}
+        </Text>
+
+        <Text style={playerStyles.subtitle}>
+          {item.category} · {item.genre}
+        </Text>
       </SafeAreaView>
     </Modal>
   );
 }
 
 export default function V2CinemaScreen({ navigation }) {
-  const [cat, setCat] = useState('الكل');
-  const [playing, setPlaying] = useState(null);
+  const insets = useSafeAreaInsets();
 
-  const list = cat === 'الكل' ? ITEMS : ITEMS.filter((i) => i.cat === cat);
+  const [category, setCategory] = useState('الكل');
+  const [playing, setPlaying] = useState(null);
+  const [serverItems, setServerItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [serverError, setServerError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMedia() {
+      try {
+        setLoading(true);
+        setServerError('');
+
+        const response = await fetch(
+          `${SERVER_URL}/media-list`
+        );
+
+        if (!response.ok) {
+          throw new Error('media-list request failed');
+        }
+
+        const data = await response.json();
+        const items = normalizeServerFiles(data);
+
+        if (mounted) {
+          setServerItems(items);
+        }
+      } catch (error) {
+        console.log('Cinema media error:', error);
+
+        if (mounted) {
+          setServerError(
+            'تعذر تحميل ملفات السيرفر'
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadMedia();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const allItems = useMemo(() => {
+    return [
+      ...DEMO_ITEMS,
+      ...serverItems,
+    ];
+  }, [serverItems]);
+
+  const filteredItems = useMemo(() => {
+    if (category === 'الكل') {
+      return allItems;
+    }
+
+    return allItems.filter(
+      (item) => item.category === category
+    );
+  }, [allItems, category]);
 
   return (
-    <View style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="arrow-forward" size={26} color="#fff" /></TouchableOpacity>
-        <Text style={s.headerTitle}>سينما وتلفاز</Text>
-      </View>
-
-      <View style={s.tabsRow}>
-        {CATS.map((c) => (
-          <TouchableOpacity key={c} onPress={() => setCat(c)} style={[s.tab, cat === c && s.tabActive]}>
-            <Text style={[s.tabTxt, cat === c && s.tabTxtActive]}>{c}</Text>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons
+              name="arrow-forward"
+              size={30}
+              color="#FFFFFF"
+            />
           </TouchableOpacity>
-        ))}
-      </View>
 
-      <Text style={s.countTxt}>المتاح على شبكتك ({list.length})</Text>
+          <Text style={styles.headerTitle}>
+            سينما وتلفاز
+          </Text>
+        </View>
 
-      <FlatList
-        data={list}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={s.grid}
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={[s.card, { backgroundColor: item.color }]} onPress={() => setPlaying(item)}>
-            <Text style={s.emoji}>{item.emoji}</Text>
-            <View style={s.cardFooter}>
-              <Text style={s.cardTitle} numberOfLines={1}>{item.title}</Text>
-              <Text style={s.cardSub}>{item.dur} · {item.genre}</Text>
-            </View>
-          </TouchableOpacity>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categories}
+        >
+          {CATEGORIES.map((itemCategory) => (
+            <TouchableOpacity
+              key={itemCategory}
+              onPress={() =>
+                setCategory(itemCategory)
+              }
+              style={[
+                styles.categoryButton,
+                category === itemCategory &&
+                  styles.categoryButtonActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.categoryText,
+                  category === itemCategory &&
+                    styles.categoryTextActive,
+                ]}
+              >
+                {itemCategory}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.countText}>
+            المتاح على شبكتك (
+            {filteredItems.length}
+            )
+          </Text>
+
+          {loading && (
+            <ActivityIndicator
+              size="small"
+              color={C.primary}
+            />
+          )}
+        </View>
+
+        {!!serverError && (
+          <Text style={styles.errorText}>
+            {serverError}
+          </Text>
         )}
-      />
 
-      {playing && <PlayerModal item={playing} onClose={() => setPlaying(null)} />}
-    </View>
+        <FlatList
+          data={filteredItems}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.grid,
+            {
+              paddingBottom: insets.bottom + 45,
+            },
+          ]}
+          columnWrapperStyle={styles.column}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.card,
+                {
+                  backgroundColor: item.color,
+                },
+              ]}
+              onPress={() => setPlaying(item)}
+            >
+              <View style={styles.cardImage}>
+                <Text style={styles.emoji}>
+                  {item.emoji}
+                </Text>
+
+                {item.remote && (
+                  <View style={styles.networkBadge}>
+                    <Ionicons
+                      name="wifi"
+                      size={13}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.networkText}>
+                      الشبكة
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.cardFooter}>
+                <Text
+                  style={styles.cardTitle}
+                  numberOfLines={1}
+                >
+                  {item.title}
+                </Text>
+
+                <Text style={styles.cardSub}>
+                  {item.duration} · {item.genre}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Ionicons
+                name="film-outline"
+                size={42}
+                color={C.muted}
+              />
+
+              <Text style={styles.emptyText}>
+                لا يوجد محتوى في هذا التصنيف
+              </Text>
+
+              <Text style={styles.emptyHint}>
+                أضف ملفات MP4 إلى مجلد server/media
+              </Text>
+            </View>
+          }
+        />
+
+        {playing && (
+          <PlayerModal
+            key={playing.id}
+            item={playing}
+            onClose={() => setPlaying(null)}
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  header: { flexDirection: 'row-reverse', alignItems: 'center', marginTop: 44, marginBottom: 14, paddingHorizontal: 20 },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginRight: 14 },
-  tabsRow: { flexDirection: 'row-reverse', paddingHorizontal: 16, marginBottom: 8 },
-  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 18, backgroundColor: C.surface, marginLeft: 8 },
-  tabActive: { backgroundColor: C.primary },
-  tabTxt: { color: C.sub, fontSize: 13, fontWeight: '600' },
-  tabTxtActive: { color: '#fff' },
-  countTxt: { color: C.sub, fontSize: 12, textAlign: 'right', paddingHorizontal: 20, marginBottom: 10 },
-  grid: { paddingHorizontal: 16, paddingBottom: 30 },
-  card: { width: '48%', height: 170, borderRadius: 16, marginBottom: 14, overflow: 'hidden', justifyContent: 'space-between' },
-  emoji: { fontSize: 48, textAlign: 'center', marginTop: 24 },
-  cardFooter: { backgroundColor: 'rgba(11,17,32,0.55)', padding: 10 },
-  cardTitle: { color: '#fff', fontSize: 14, fontWeight: 'bold', textAlign: 'right' },
-  cardSub: { color: '#CBD5E1', fontSize: 11, textAlign: 'right', marginTop: 2 },
+const CARD_WIDTH = (width - 48) / 2;
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+
+  container: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+
+  header: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+
+  backButton: {
+    padding: 5,
+  },
+
+  headerTitle: {
+    flex: 1,
+    color: C.text,
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'right',
+    marginRight: 15,
+  },
+
+  categories: {
+    flexDirection: 'row-reverse',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+
+  categoryButton: {
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    paddingHorizontal: 17,
+    paddingVertical: 10,
+    marginLeft: 8,
+  },
+
+  categoryButtonActive: {
+    backgroundColor: C.primary,
+  },
+
+  categoryText: {
+    color: C.sub,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  categoryTextActive: {
+    color: '#FFFFFF',
+  },
+
+  infoRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+
+  countText: {
+    color: C.sub,
+    fontSize: 13,
+    textAlign: 'right',
+  },
+
+  errorText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+
+  grid: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+
+  column: {
+    justifyContent: 'space-between',
+  },
+
+  card: {
+    width: CARD_WIDTH,
+    height: 190,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+
+  cardImage: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+
+  emoji: {
+    fontSize: 54,
+  },
+
+  networkBadge: {
+    position: 'absolute',
+    top: 9,
+    left: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+
+  networkText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    marginLeft: 3,
+  },
+
+  cardFooter: {
+    backgroundColor: 'rgba(11,17,32,0.72)',
+    padding: 10,
+  },
+
+  cardTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'right',
+  },
+
+  cardSub: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: 3,
+  },
+
+  emptyBox: {
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingHorizontal: 20,
+  },
+
+  emptyText: {
+    color: C.sub,
+    fontSize: 15,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+
+  emptyHint: {
+    color: C.muted,
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
+  },
 });
-const p = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  closeBtn: { position: 'absolute', top: 40, left: 16, zIndex: 10 },
-  video: { width: '100%', height: 300, marginTop: 80 },
-  title: { color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginTop: 16 },
+
+const playerStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+
+  closeButton: {
+    alignSelf: 'flex-start',
+    padding: 12,
+  },
+
+  video: {
+    width: '100%',
+    height: 300,
+    marginTop: 25,
+  },
+
+  title: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 20,
+    paddingHorizontal: 15,
+  },
+
+  subtitle: {
+    color: '#94A3B8',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 8,
+  },
 });
