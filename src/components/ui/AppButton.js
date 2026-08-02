@@ -13,63 +13,28 @@ import {
   V2_SPACING,
 } from '../../theme/v2Theme';
 
-export default function AppButton({
-  title,
-  onPress,
-  icon,
-  variant = 'primary',
-  loading = false,
-  disabled = false,
-  style,
-  textStyle,
-}) {
-  const isDisabled = disabled || loading;
+export default function AppButton({ ...props }) {
+  const isDisabled = props.disabled || props.loading;
 
-  const variantStyle = {
-    primary: styles.primary,
-    secondary: styles.secondary,
-    success: styles.success,
-    danger: styles.danger,
-    ghost: styles.ghost,
-  }[variant] || styles.primary;
-
-  const labelStyle = {
-    primary: styles.primaryText,
-    secondary: styles.secondaryText,
-    success: styles.primaryText,
-    danger: styles.primaryText,
-    ghost: styles.ghostText,
-  }[variant] || styles.primaryText;
-
-  const iconColor = variant === 'secondary' || variant === 'ghost'
-    ? V2_COLORS.text
-    : V2_COLORS.background;
+  const handlePress = () => {
+    console.log("تم النقر على الزر! الحالة:", { 
+        disabled: props.disabled, 
+        loading: props.loading 
+    });
+    
+    if (props.onPress) {
+        props.onPress();
+    }
+  };
 
   return (
     <TouchableOpacity
       activeOpacity={0.82}
       disabled={isDisabled}
-      onPress={onPress}
-      style={[
-        styles.button,
-        variantStyle,
-        isDisabled && styles.disabled,
-        style,
-      ]}
+      onPress={handlePress} // استبدلنا onPress بـ handlePress
+      style={[...]}
     >
-      {loading ? (
-        <ActivityIndicator color={iconColor} />
-      ) : (
-        <View style={styles.content}>
-          {icon ? (
-            <Ionicons name={icon} size={19} color={iconColor} />
-          ) : null}
-
-          <Text style={[styles.text, labelStyle, textStyle]}>
-            {title}
-          </Text>
-        </View>
-      )}
+      ...
     </TouchableOpacity>
   );
 }
