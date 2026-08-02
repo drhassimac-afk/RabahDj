@@ -35,9 +35,6 @@ export default function App() {
           <Stack.Screen name="Games" component={V2GamesScreen} />
           <Stack.Screen name="Files" component={FileShareScreen} />
           <Stack.Screen name="Nearby" component={V2NearbyScreen} />
-          <Stack.Screen name="Nearby" component={V2NearbyScreen} />
-          <Stack.Screen name="Nearby" component={V2NearbyScreen} />
-          <Stack.Screen name="Nearby" component={V2NearbyScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
