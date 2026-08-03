@@ -90,7 +90,6 @@ function getCategory(fileName) {
   if (
     name.includes('comedy') ||
     name.includes('comedic') ||
-    name.includes('k comedy') ||
     name.includes('كوميديا') ||
     name.includes('ضحك')
   ) {
@@ -101,7 +100,8 @@ function getCategory(fileName) {
     name.includes('series') ||
     name.includes('episode') ||
     name.includes('مسلسل') ||
-    name.includes('حلقة')
+    name.includes('حلقة') ||
+    name.includes('العائلة')
   ) {
     return 'مسلسلات';
   }
@@ -110,7 +110,10 @@ function getCategory(fileName) {
     name.includes('documentary') ||
     name.includes('document') ||
     name.includes('doc_') ||
-    name.includes('وثائقي')
+    name.includes('وثائقي') ||
+    name.includes('طبيعة') ||
+    name.includes('فضاء') ||
+    name.includes('حي')
   ) {
     return 'وثائقي';
   }
@@ -185,12 +188,9 @@ function normalizeServerFiles(data) {
         category,
         emoji: getEmoji(category),
         color: getColor(category),
-
-        // نبني الرابط من SERVER_URL حتى لا نستخدم IP خاطئًا
         video:
           `${SERVER_URL}/media/` +
           encodeURIComponent(fileName),
-
         remote: true,
       };
     })
@@ -507,9 +507,9 @@ const styles = StyleSheet.create({
   },
 
   categories: {
-    flexDirection: 'row-reverse',
     paddingHorizontal: 16,
     paddingVertical: 8,
+    alignItems: 'center',
   },
 
   categoryButton: {
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 17,
     paddingVertical: 10,
-    marginLeft: 8,
+    marginHorizontal: 4,
   },
 
   categoryButtonActive: {
