@@ -1,0 +1,9 @@
+Big Buck Bunny
+Copyright Blender Foundation
+License: Creative Commons Attribution 3.0
+Source: https://studio.blender.org/films/big-buck-bunny/
+
+Elephants Dream
+Copyright Blender Foundation
+License: Creative Commons Attribution
+Source: https://studio.blender.org/films/elephants-dream/
