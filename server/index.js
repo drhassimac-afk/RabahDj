@@ -517,6 +517,7 @@ io.on('connection', (socket) => {
     });
 
     // === إعجاب/إلغاء إعجاب ===
+        // === إعجاب/إلغاء إعجاب ===
     socket.on('toggleLike', (data) => {
         if (!isDbReady()) return;
         try {
@@ -526,19 +527,54 @@ io.on('connection', (socket) => {
             const post = postRef.value();
             if (!post) return;
 
-            const likes = [...(post.likes || [])];
-            const idx = likes.indexOf(socket.id);
+            const user = activeUsers.get(socket.id);
+            const userName = (data?.userName || user?.name || '').trim();
+            if (!userName) return;
+
+            let likes = [...(post.likes || [])];
+            const idx = likes.findIndex(l => typeof l === 'string' && l.trim().toLowerCase() === userName.toLowerCase());
 
             if (idx === -1) {
-                likes.push(socket.id);
+                likes.push(userName);
+                console.log(`❤️ إعجاب من [${userName}]`);
             } else {
                 likes.splice(idx, 1);
+                console.log(`💔 إلغاء إعجاب من [${userName}]`);
             }
 
             postRef.assign({ likes }).write();
             io.emit('postUpdated', postRef.value());
         } catch (err) {
             console.error('خطأ في toggleLike:', err);
+        }
+    });
+
+    // === إضافة تعليق ===
+    socket.on('newComment', (data) => {
+        if (!isDbReady()) return;
+        try {
+            if (!data?.postId || !data?.text?.trim()) return;
+
+            const user = activeUsers.get(socket.id);
+            if (!user) return;
+
+            const postRef = db.get('posts').find({ id: data.postId });
+            const post = postRef.value();
+            if (!post) return;
+
+            const comments = [...(post.comments || [])];
+            comments.push({
+                id: Date.now().toString(),
+                authorName: user.name,
+                avatarColor: user.avatarColor,
+                text: data.text.trim(),
+                createdAt: new Date().toISOString(),
+            });
+
+            postRef.assign({ comments }).write();
+            io.emit('postUpdated', postRef.value());
+        } catch (err) {
+            console.error('خطأ في newComment:', err);
         }
     });
 
