@@ -1,4 +1,4 @@
-name: Build React Native Android APK
+name: Build Debug APK (Dev with Metro)
 
 on:
   push:
@@ -28,25 +28,24 @@ jobs:
       - name: 📦 Install Dependencies
         run: npm install --legacy-peer-deps
 
-      - name: 🏗️ Generate Android Folder (Expo Prebuild)
+      - name: 🏗️ Generate Android Folder
         run: npx expo prebuild --platform android
 
-      - name: 🛠️ Force JS Bundle Inside Debug APK
+      - name: 🛠️ Embed JS Bundle in Debug APK (Fallback)
         run: |
           cd android/app
           sed -i '/^react {/a\    debuggableVariants = []' build.gradle
-          echo "--- محتوى كتلة react بعد التعديل ---"
-          grep -A 5 "^react {" build.gradle
 
-      - name: 🚀 Build Android Release APK
+      - name: 🚀 Build Debug APK
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
         run: |
           cd android
+          chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: 📤 Upload APK Artifact
+      - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: RabahDj-App-Release
+          name: RabahDj-App-Debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
