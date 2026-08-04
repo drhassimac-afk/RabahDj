@@ -2,10 +2,15 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
   KeyboardAvoidingView, Platform, Alert, Animated, Modal,
+  LayoutAnimation, UIManager, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSocket } from '../../api/socket';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const C = {
   bg: '#0B1120', surface: '#161F2E', surfaceLight: '#1C2840',
@@ -43,6 +48,7 @@ function PostCard({ item, myName, onLike, onDelete, onComments }) {
   const iLiked = likes.some(l => typeof l === 'string' && l.trim().toLowerCase() === cleanMyName);
   const commentCount = (item.comments || []).length;
   const scale = useRef(new Animated.Value(1)).current;
+  const sendScale = useRef(new Animated.Value(1)).current;
 
   const handleLike = () => {
     Animated.sequence([
@@ -111,16 +117,22 @@ export default function V2WallScreen({ route, navigation }) {
   const [text, setText] = useState('');
   const [commentsPostId, setCommentsPostId] = useState(null);
   const [commentText, setCommentText] = useState('');
+  const [sending, setSending] = useState(false);
   const sock = useRef(getSocket());
+  const commentsListRef = useRef(null);
 
   useEffect(() => {
     const s = sock.current;
-    const onPostsList = (list) => setPosts(list || []);
-    const onPostAdded = (post) => setPosts((prev) => [post, ...prev]);
+    const animate = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+    const onPostsList = (list) => { animate(); setPosts(list || []); };
+    const onPostAdded = (post) => { animate(); setPosts((prev) => [post, ...prev]); };
     const onPostUpdated = (updated) =>
       setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    const onPostDeleted = ({ postId }) =>
+    const onPostDeleted = ({ postId }) => {
+      animate();
       setPosts((prev) => prev.filter((p) => p.id !== postId));
+    };
 
     s.on('postsList', onPostsList);
     s.on('postAdded', onPostAdded);
@@ -139,9 +151,19 @@ export default function V2WallScreen({ route, navigation }) {
     if (!t) return;
     sock.current.emit('newPost', { text: t });
     setText('');
+    Keyboard.dismiss();
   };
 
+  // تحديث فوري محلي (Optimistic) + إرسال للسيرفر — الإحساس بيبقى لحظي
   const toggleLike = useCallback((postId) => {
+    const cleanMyName = myName.trim().toLowerCase();
+    setPosts((prev) => prev.map((p) => {
+      if (p.id !== postId) return p;
+      const likes = Array.isArray(p.likes) ? [...p.likes] : [];
+      const idx = likes.findIndex((l) => typeof l === 'string' && l.trim().toLowerCase() === cleanMyName);
+      if (idx === -1) likes.push(myName); else likes.splice(idx, 1);
+      return { ...p, likes };
+    }));
     sock.current.emit('toggleLike', { postId, userName: myName });
   }, [myName]);
 
@@ -151,9 +173,14 @@ export default function V2WallScreen({ route, navigation }) {
 
   const sendComment = () => {
     const t = commentText.trim();
-    if (!t || !commentsPostId) return;
+    if (!t || !commentsPostId || sending) return;
+    setSending(true);
     sock.current.emit('newComment', { postId: commentsPostId, text: t });
     setCommentText('');
+    setTimeout(() => {
+      commentsListRef.current?.scrollToEnd?.({ animated: true });
+      setSending(false);
+    }, 150);
   };
 
   const commentsPost = useMemo(
@@ -162,7 +189,7 @@ export default function V2WallScreen({ route, navigation }) {
   );
 
   const canSend = text.trim().length > 0;
-  const canSendComment = commentText.trim().length > 0;
+  const canSendComment = commentText.trim().length > 0 && !sending;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -199,7 +226,7 @@ export default function V2WallScreen({ route, navigation }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={s.composer}>
           <TouchableOpacity style={[s.sendBtn, !canSend && s.sendBtnDisabled]}
-            onPress={publish} disabled={!canSend}>
+            onPress={publish} disabled={!canSend} activeOpacity={0.75}>
             <Ionicons name="send" size={20} color="#fff" />
           </TouchableOpacity>
           <View style={s.inputBox}>
@@ -235,6 +262,7 @@ export default function V2WallScreen({ route, navigation }) {
             </View>
 
             <FlatList
+              ref={commentsListRef}
               data={commentsPost?.comments || []}
               extraData={commentsPost}
               keyExtractor={(c) => c.id}
@@ -268,7 +296,7 @@ export default function V2WallScreen({ route, navigation }) {
               <View style={s.composer}>
                 <TouchableOpacity
                   style={[s.sendBtn, !canSendComment && s.sendBtnDisabled]}
-                  onPress={sendComment} disabled={!canSendComment}>
+                  onPress={sendComment} disabled={!canSendComment} activeOpacity={0.75}>
                   <Ionicons name="send" size={18} color="#fff" />
                 </TouchableOpacity>
                 <TextInput
