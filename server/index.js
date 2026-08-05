@@ -36,6 +36,10 @@ const PORT = 4000;
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // ✅ حد للـ JSON
+
+app.get('/ping', (req, res) => {
+    res.json({ app: 'RabahDj', ok: true });
+});
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 const uploadDir = path.join(__dirname, 'uploads');

@@ -1,8 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import {
   Platform,
   StatusBar,
+  View,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 
 import * as NavigationBar from 'expo-navigation-bar';
@@ -19,6 +23,8 @@ import {
 import {
   SafeAreaProvider,
 } from 'react-native-safe-area-context';
+
+import { discoverServer } from './src/api/config';
 
 import V2WelcomeScreen from './src/screens/v2/V2WelcomeScreen';
 import MainTabs from './src/navigation/MainTabs';
@@ -74,10 +80,49 @@ async function configureAndroidNavigationBar() {
   }
 }
 
+function ServerSearchScreen() {
+  return (
+    <View style={loadingStyles.wrap}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B1120" />
+      <ActivityIndicator size="large" color="#3B82F6" />
+      <Text style={loadingStyles.text}>جاري البحث عن السيرفر...</Text>
+      <Text style={loadingStyles.hint}>تأكد إنك متصل بنفس شبكة الواي فاي</Text>
+    </View>
+  );
+}
+
+const loadingStyles = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    backgroundColor: '#0B1120',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  text: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  hint: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 8,
+  },
+});
+
 export default function App() {
+  const [serverReady, setServerReady] = useState(false);
+
   useEffect(() => {
     configureAndroidNavigationBar();
+    discoverServer().finally(() => setServerReady(true));
   }, []);
+
+  if (!serverReady) {
+    return <ServerSearchScreen />;
+  }
 
   return (
     <SafeAreaProvider>
