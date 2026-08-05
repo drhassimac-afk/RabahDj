@@ -21,3 +21,8 @@ export function clearNotifications() {
   items = [];
   listeners.forEach((cb) => cb(items));
 }
+
+export function removeNotification(id) {
+  items = items.filter((n) => n.id !== id);
+  listeners.forEach((cb) => cb(items));
+}
