@@ -8,7 +8,7 @@ const SCAN_PING_TIMEOUT = 350;     // مهلة فحص كل جهاز أثناء �
 const SCAN_BATCH_SIZE = 40;        // كام جهاز يتفحصوا مع بعض بالتوازي
 
 // قيمة افتراضية احتياطية لحد ما الاكتشاف يخلص
-export let SERVER_URL = 'http://192.168.100.2:4000';
+export let SERVER_URL = 'http://127.0.0.1:4000';
 export let SOCKET_URL = SERVER_URL;
 
 function applyServerIp(ip) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Vibration } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Vibration, Animated, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RTCPeerConnection, RTCView, mediaDevices } from 'react-native-webrtc';
@@ -9,19 +9,55 @@ const C = { bg:'#0B1120', surface:'#161F2E', elevated:'#1E2A3D', border:'#243044
 const ROOM = 'rabahdj-main';
 const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
+function PressableScale({ style, onPress, children }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onIn = () => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true, speed: 60 }).start();
+  const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start();
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity style={style} onPress={onPress} activeOpacity={0.85} onPressIn={onIn} onPressOut={onOut}>
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function V2LiveStreamScreen({ navigation }) {
   const sock = useRef(getSocket());
   const peersRef = useRef({});      // للمذيع: { viewerId: RTCPeerConnection }
   const pcRef = useRef(null);       // للمشاهد: اتصال وحيد بالمذيع
   const localStreamRef = useRef(null);
-
   const [role, setRole] = useState(null); // null | 'broadcaster' | 'viewer'
   const [remoteStream, setRemoteStream] = useState(null);
   const [live, setLive] = useState(false);
   const [broadcasterName, setBroadcasterName] = useState('');
   const [toast, setToast] = useState('');
   const tT = useRef(null);
-  const flash = (m) => { setToast(m); clearTimeout(tT.current); tT.current = setTimeout(() => setToast(''), 2200); };
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+  const livePulse = useRef(new Animated.Value(1)).current;
+
+  const flash = (m) => {
+    setToast(m);
+    clearTimeout(tT.current);
+    Animated.spring(toastAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 10 }).start();
+    tT.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setToast(''));
+    }, 2200);
+  };
+
+  useEffect(() => {
+    Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, [role]);
+
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(livePulse, { toValue: 1.6, duration: 700, useNativeDriver: true }),
+      Animated.timing(livePulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
 
   useEffect(() => {
     const s = sock.current;
@@ -143,31 +179,42 @@ export default function V2LiveStreamScreen({ navigation }) {
     return (
       <SafeAreaView style={st.safe}>
         <View style={st.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="arrow-forward" size={24} color={C.sub} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-forward" size={24} color={C.sub} />
+          </TouchableOpacity>
           <Text style={st.hTitle}>البث المباشر</Text>
           <View style={{ width:24 }} />
         </View>
-        <View style={st.center}>
-          <View style={st.liveIcon}><Ionicons name="videocam" size={54} color={C.live} /></View>
+        <Animated.View style={[st.center, { opacity: fade }]}>
+          <View style={st.liveIcon}>
+            {live && (
+              <Animated.View style={[st.liveIconPulse, { transform: [{ scale: livePulse }], opacity: livePulse.interpolate({ inputRange: [1, 1.6], outputRange: [0.5, 0] }) }]} />
+            )}
+            <Ionicons name="videocam" size={54} color={C.live} />
+          </View>
           {live ? (
             <>
               <Text style={st.statusTxt}>🔴 {broadcasterName || 'أحدهم'} يبثّ الآن</Text>
-              <TouchableOpacity style={st.btn} onPress={joinAsViewer}>
+              <PressableScale style={st.btn} onPress={joinAsViewer}>
                 <Ionicons name="eye" size={20} color="#fff" style={{ marginLeft:8 }} />
                 <Text style={st.btnTxt}>مشاهدة البث</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </>
           ) : (
             <>
               <Text style={st.statusTxt}>لا يوجد بث حاليًا</Text>
-              <TouchableOpacity style={[st.btn, { backgroundColor:C.live }]} onPress={startBroadcast}>
+              <PressableScale style={[st.btn, { backgroundColor:C.live }]} onPress={startBroadcast}>
                 <Ionicons name="radio" size={20} color="#fff" style={{ marginLeft:8 }} />
                 <Text style={st.btnTxt}>ابدأ البث الآن</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </>
           )}
-        </View>
-        {!!toast && <View style={st.toast}><Text style={st.toastTxt}>{toast}</Text></View>}
+        </Animated.View>
+        {!!toast && (
+          <Animated.View style={[st.toast, { opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
+            <Text style={st.toastTxt}>{toast}</Text>
+          </Animated.View>
+        )}
       </SafeAreaView>
     );
   }
@@ -178,18 +225,28 @@ export default function V2LiveStreamScreen({ navigation }) {
       {remoteStream ? (
         <RTCView streamURL={remoteStream.toURL()} style={st.video} objectFit="cover" mirror={role === 'broadcaster'} />
       ) : (
-        <View style={[st.video, st.videoLoading]}><Text style={st.statusTxt}>⏳ جاري الاتصال...</Text></View>
+        <View style={[st.video, st.videoLoading]}>
+          <ActivityIndicator size="large" color={C.live} />
+          <Text style={[st.statusTxt, { marginTop: 16 }]}>جاري الاتصال...</Text>
+        </View>
       )}
       <View style={st.overlayTop}>
-        <View style={st.liveBadge}><View style={st.liveDot} /><Text style={st.liveBadgeTxt}>{role === 'broadcaster' ? 'أنت تبثّ' : 'مشاهدة'}</Text></View>
+        <View style={st.liveBadge}>
+          <Animated.View style={[st.liveDot, { transform: [{ scale: livePulse }] }]} />
+          <Text style={st.liveBadgeTxt}>{role === 'broadcaster' ? 'أنت تبثّ' : 'مشاهدة'}</Text>
+        </View>
       </View>
       <View style={st.overlayBottom}>
-        <TouchableOpacity style={st.exitBtn} onPress={exit}>
+        <PressableScale style={st.exitBtn} onPress={exit}>
           <Ionicons name={role === 'broadcaster' ? 'stop-circle' : 'close-circle'} size={22} color="#fff" />
           <Text style={st.exitTxt}>{role === 'broadcaster' ? 'إنهاء البث' : 'مغادرة'}</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
-      {!!toast && <View style={st.toast}><Text style={st.toastTxt}>{toast}</Text></View>}
+      {!!toast && (
+        <Animated.View style={[st.toast, { opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
+          <Text style={st.toastTxt}>{toast}</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -201,6 +258,7 @@ const st = StyleSheet.create({
   hTitle: { color:C.text, fontSize:18, fontWeight:'800' },
   center: { flex:1, alignItems:'center', justifyContent:'center', paddingHorizontal:30 },
   liveIcon: { width:110, height:110, borderRadius:55, backgroundColor:C.liveBg, alignItems:'center', justifyContent:'center', marginBottom:24 },
+  liveIconPulse: { position:'absolute', width:110, height:110, borderRadius:55, backgroundColor:C.live },
   statusTxt: { color:C.text, fontSize:16, fontWeight:'700', marginBottom:24, textAlign:'center' },
   btn: { flexDirection:'row', backgroundColor:C.primary, height:54, borderRadius:27, paddingHorizontal:28, alignItems:'center', justifyContent:'center' },
   btnTxt: { color:'#fff', fontSize:16, fontWeight:'700' },
