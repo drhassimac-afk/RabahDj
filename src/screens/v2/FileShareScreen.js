@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, Vibration } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, Vibration, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -20,6 +20,29 @@ function humanSize(b) {
   if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
   return (b/1048576).toFixed(1) + ' MB';
 }
+function fileIconMeta(name) {
+  const e = (name || '').split('.').pop().toLowerCase();
+  if (['jpg','jpeg','png','gif','webp'].includes(e)) return { icon: 'image', color: C.primary };
+  if (['mp4','mkv','mov'].includes(e)) return { icon: 'film', color: C.live };
+  if (['mp3','wav','m4a'].includes(e)) return { icon: 'musical-notes', color: '#EC4899' };
+  if (e === 'apk') return { icon: 'phone-portrait', color: C.success };
+  if (e === 'pdf') return { icon: 'document-text', color: '#EF4444' };
+  if (['zip','rar','7z'].includes(e)) return { icon: 'archive', color: C.gold };
+  return { icon: 'document-attach', color: C.gold };
+}
+
+function PressableScale({ style, onPress, children }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onIn = () => Animated.spring(scale, { toValue: 0.95, useNativeDriver: true, speed: 60 }).start();
+  const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start();
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity style={style} onPress={onPress} activeOpacity={0.8} onPressIn={onIn} onPressOut={onOut}>
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
 
 export default function FileShareScreen({ route, navigation }) {
   const me = (route.params && route.params.name) || 'مستخدم';
@@ -28,13 +51,21 @@ export default function FileShareScreen({ route, navigation }) {
   const [uploads, setUploads] = useState({});
   const [toast, setToast] = useState('');
   const tT = useRef(null);
-  const flash = (m) => { setToast(m); clearTimeout(tT.current); tT.current = setTimeout(()=>setToast(''),1900); };
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
+  const flash = (m) => {
+    setToast(m);
+    clearTimeout(tT.current);
+    Animated.spring(toastAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 10 }).start();
+    tT.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setToast(''));
+    }, 1900);
+  };
 
   useEffect(() => {
     const s = sock.current;
     const onFile = (d) => { setFiles(prev => [d, ...prev.filter(x => x.url !== d.url)]); flash('📥 ملف جديد: ' + (d.name||'')); Vibration.vibrate(30); };
     s.on('file_shared', onFile);
-    // محاولة تحميل الموجود (best-effort)
     fetch(SERVER_URL + '/media-list').then(r => r.json()).then(list => {
       if (Array.isArray(list)) setFiles(list.map(it => ({ name: it.name || it.filename || 'ملف', url: it.url || (SERVER_URL + it.path), size: it.size })).filter(x => x.url));
     }).catch(()=>{});
@@ -88,34 +119,43 @@ export default function FileShareScreen({ route, navigation }) {
     } catch (e) { flash('⚠️ تعذّر فتح الملفات'); }
   };
 
-  const Row = ({ item }) => (
-    <View style={st.row}>
-      <View style={st.ficon}><Ionicons name="document-attach" size={24} color={C.gold} /></View>
-      <View style={{ flex:1 }}>
-        <Text style={st.fname} numberOfLines={1}>{item.name}</Text>
-        <Text style={st.fmeta}>{(item.from ? 'من ' + item.from + ' · ' : '') + humanSize(item.size)}</Text>
+  const Row = ({ item }) => {
+    const meta = fileIconMeta(item.name);
+    return (
+      <View style={st.row}>
+        <View style={[st.ficon, { backgroundColor: meta.color + '22' }]}>
+          <Ionicons name={meta.icon} size={24} color={meta.color} />
+        </View>
+        <View style={{ flex:1 }}>
+          <Text style={st.fname} numberOfLines={1}>{item.name}</Text>
+          <Text style={st.fmeta}>{(item.from ? 'من ' + item.from + ' · ' : '') + humanSize(item.size)}</Text>
+        </View>
+        <PressableScale style={st.dl} onPress={() => Linking.openURL(item.url)}>
+          <Ionicons name="download" size={22} color="#fff" />
+        </PressableScale>
       </View>
-      <TouchableOpacity style={st.dl} onPress={() => Linking.openURL(item.url)}><Ionicons name="download" size={22} color="#fff" /></TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   const upList = Object.values(uploads);
 
   return (
     <SafeAreaView style={st.safe}>
       <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="arrow-forward" size={24} color={C.sub} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="arrow-forward" size={24} color={C.sub} />
+        </TouchableOpacity>
         <Text style={st.hTitle}>مشاركة الملفات</Text>
         <View style={{ width:24 }} />
       </View>
 
       <View style={st.picks}>
-        <TouchableOpacity style={[st.pick, { backgroundColor:'#152A47' }]} onPress={pickImage}>
+        <PressableScale style={[st.pick, { backgroundColor:'#152A47' }]} onPress={pickImage}>
           <Ionicons name="images" size={26} color={C.primary} /><Text style={st.pickTxt}>صورة / فيديو</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[st.pick, { backgroundColor:'#2A1B3D' }]} onPress={pickFile}>
+        </PressableScale>
+        <PressableScale style={[st.pick, { backgroundColor:'#2A1B3D' }]} onPress={pickFile}>
           <Ionicons name="folder-open" size={26} color={C.live} /><Text style={st.pickTxt}>ملف / تطبيق</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {upList.map((u, i) => (
@@ -127,9 +167,24 @@ export default function FileShareScreen({ route, navigation }) {
       ))}
 
       <FlatList data={files} keyExtractor={(it, i) => (it.url || '') + i} renderItem={Row} contentContainerStyle={st.list}
-        ListEmptyComponent={<Text style={st.empty}>لا ملفات بعد. اختر صورة أو ملفًا للإرسال 📤</Text>} />
+        ListEmptyComponent={
+          <View style={st.emptyBox}>
+            <Ionicons name="cloud-upload-outline" size={44} color={C.muted} />
+            <Text style={st.empty}>لا ملفات بعد. اختر صورة أو ملفًا للإرسال 📤</Text>
+          </View>
+        } />
 
-      {!!toast && <View style={st.toast}><Text style={st.toastTxt}>{toast}</Text></View>}
+      {!!toast && (
+        <Animated.View style={[
+          st.toast,
+          {
+            opacity: toastAnim,
+            transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+          },
+        ]}>
+          <Text style={st.toastTxt}>{toast}</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -146,10 +201,11 @@ const st = StyleSheet.create({
   bar:{height:6,borderRadius:3,backgroundColor:C.elevated,overflow:'hidden'},
   barFill:{height:6,backgroundColor:C.primary},
   progPct:{color:C.sub,fontSize:11,marginTop:4,textAlign:'left'},
-  list:{padding:16,paddingBottom:30},
-  empty:{color:C.muted,textAlign:'center',marginTop:40,fontSize:14},
+  list:{padding:16,paddingBottom:30,flexGrow:1},
+  emptyBox:{flex:1,alignItems:'center',justifyContent:'center',paddingTop:60},
+  empty:{color:C.muted,textAlign:'center',marginTop:14,fontSize:14},
   row:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:16,padding:12,marginBottom:10,borderWidth:1,borderColor:C.border},
-  ficon:{width:44,height:44,borderRadius:12,backgroundColor:C.gold+'22',alignItems:'center',justifyContent:'center'},
+  ficon:{width:44,height:44,borderRadius:12,alignItems:'center',justifyContent:'center'},
   fname:{color:C.text,fontSize:14,fontWeight:'700',marginRight:10},
   fmeta:{color:C.muted,fontSize:11,marginRight:10,marginTop:2},
   dl:{width:44,height:44,borderRadius:22,backgroundColor:C.primary,alignItems:'center',justifyContent:'center'},
