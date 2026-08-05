@@ -1,29 +1,86 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SERVER_URL } from '../../api/config';
+import { SERVER_URL, discoverServer } from '../../api/config';
 
-const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', gold:'#FACC15' };
+const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', gold:'#FACC15', success:'#22C55E', danger:'#EF4444' };
+
+function PressableScale({ style, onPress, disabled, children }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 60 }).start();
+  const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start();
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity style={style} onPress={onPress} disabled={disabled} activeOpacity={0.8} onPressIn={onIn} onPressOut={onOut}>
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
 
 export default function V2SettingsScreen({ navigation }) {
+  const [serverAddr, setServerAddr] = useState(SERVER_URL.replace('http://', ''));
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null); // null | 'success' | 'fail'
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(14)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(slide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 6 }),
+    ]).start();
+  }, []);
+
+  const rescan = async () => {
+    setScanning(true);
+    setScanResult(null);
+    const { ip } = await discoverServer();
+    setScanning(false);
+    if (ip) {
+      setServerAddr(SERVER_URL.replace('http://', ''));
+      setScanResult('success');
+    } else {
+      setScanResult('fail');
+    }
+    setTimeout(() => setScanResult(null), 3000);
+  };
+
   return (
     <SafeAreaView style={s.safe}>
       <Text style={s.header}>الإعدادات</Text>
 
-      <View style={s.card}>
-        <Ionicons name="server-outline" size={22} color={C.primary} />
-        <View style={{ marginRight: 12, flex: 1 }}>
-          <Text style={s.label}>عنوان السيرفر</Text>
-          <Text style={s.value}>{SERVER_URL.replace('http://', '')}</Text>
+      <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }], width: '100%' }}>
+        <View style={s.card}>
+          <Ionicons name="server-outline" size={22} color={C.primary} />
+          <View style={{ marginRight: 12, flex: 1 }}>
+            <Text style={s.label}>عنوان السيرفر</Text>
+            <Text style={s.value}>{serverAddr}</Text>
+          </View>
         </View>
-      </View>
 
-      <TouchableOpacity style={s.card} onPress={() => navigation.navigate('V2AdminLoginScreen')}>
-        <Ionicons name="shield-checkmark-outline" size={22} color={C.gold} />
-        <Text style={[s.label, { marginRight: 12, flex: 1 }]}>لوحة الإدارة</Text>
-        <Ionicons name="chevron-back" size={18} color={C.sub} />
-      </TouchableOpacity>
+        <PressableScale style={s.card} onPress={rescan} disabled={scanning}>
+          {scanning ? (
+            <ActivityIndicator size="small" color={C.primary} />
+          ) : (
+            <Ionicons
+              name={scanResult === 'success' ? 'checkmark-circle' : scanResult === 'fail' ? 'close-circle' : 'refresh-outline'}
+              size={22}
+              color={scanResult === 'success' ? C.success : scanResult === 'fail' ? C.danger : C.primary}
+            />
+          )}
+          <Text style={[s.label, { marginRight: 12, flex: 1, color: C.text, fontWeight: '600' }]}>
+            {scanning ? 'جاري البحث عن السيرفر...' : scanResult === 'success' ? 'تم العثور على السيرفر ✓' : scanResult === 'fail' ? 'لم يتم العثور على السيرفر' : 'إعادة البحث عن السيرفر'}
+          </Text>
+        </PressableScale>
+
+        <PressableScale style={s.card} onPress={() => navigation.navigate('V2AdminLoginScreen')}>
+          <Ionicons name="shield-checkmark-outline" size={22} color={C.gold} />
+          <Text style={[s.label, { marginRight: 12, flex: 1, color: C.text, fontWeight: '600' }]}>لوحة الإدارة</Text>
+          <Ionicons name="chevron-back" size={18} color={C.sub} />
+        </PressableScale>
+      </Animated.View>
 
       <Text style={s.ver}>RabahDj — الإصدار 2.0.0</Text>
     </SafeAreaView>
