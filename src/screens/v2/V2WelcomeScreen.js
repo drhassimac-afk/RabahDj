@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Vibration, Animated, Easing, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Vibration, Animated, Easing, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, subscribe } from '../../api/notifications';
@@ -7,16 +7,54 @@ import { getNotifications, subscribe } from '../../api/notifications';
 const C = {
   bg:'#0B1120', primary:'#3B82F6', primarySoft:'#1E3A5F',
   text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B',
-  live:'#A855F7', liveBg:'#2A1B3D',
-  walkie:'#14B8A6', walkieBg:'#0F3B36',
-  chat:'#3B82F6', chatBg:'#152A47',
-  games:'#F59E0B', gamesBg:'#3D2E14',
+  live:'#A855F7', liveBg:'#2A1B3D', walkie:'#14B8A6', walkieBg:'#0F3B36',
+  chat:'#3B82F6', chatBg:'#152A47', games:'#F59E0B', gamesBg:'#3D2E14',
 };
+
+function PressableScale({ style, onPress, children }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onIn = () => Animated.spring(scale, { toValue: 0.93, useNativeDriver: true, speed: 60 }).start();
+  const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start();
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity style={style} onPress={onPress} activeOpacity={0.85} onPressIn={onIn} onPressOut={onOut}>
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+function FeatureTile({ f, index }) {
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 350, delay: index * 60, useNativeDriver: true }),
+      Animated.spring(slide, { toValue: 0, delay: index * 60, useNativeDriver: true, speed: 14, bounciness: 6 }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
+      <PressableScale style={s.cell} onPress={f.onPress}>
+        <View style={[s.tile, { backgroundColor: f.bg }]}>
+          <Ionicons name={f.icon} size={30} color={f.color} />
+          {!!f.badge && (
+            <View style={s.badge}><Text style={s.badgeTxt}>{f.badge > 9 ? '9+' : f.badge}</Text></View>
+          )}
+        </View>
+        <Text style={s.cellLbl}>{f.label}</Text>
+      </PressableScale>
+    </Animated.View>
+  );
+}
 
 export default function V2WelcomeScreen({ navigation }) {
   const [notifCount, setNotifCount] = React.useState(getNotifications().length);
   React.useEffect(() => { const unsub = subscribe((items) => setNotifCount(items.length)); return unsub; }, []);
   const pulse = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(pulse,{toValue:1,duration:1800,easing:Easing.out(Easing.ease),useNativeDriver:true}),
@@ -24,10 +62,9 @@ export default function V2WelcomeScreen({ navigation }) {
     ]));
     loop.start(); return () => loop.stop();
   }, []);
+
   const scale = pulse.interpolate({inputRange:[0,1],outputRange:[1,1.08]});
   const op = pulse.interpolate({inputRange:[0,1],outputRange:[0.35,0.08]});
-
-  const soon = (label) => { Vibration.vibrate(40); Alert.alert(label, 'هذه الميزة قيد التطوير وستفعّل قريبًا 🔧'); };
 
   const FEATURES = [
     { icon:'videocam',        label:'بث مباشر',     color:C.live,   bg:C.liveBg,   onPress:()=>navigation.navigate('LiveStream') },
@@ -53,25 +90,15 @@ export default function V2WelcomeScreen({ navigation }) {
         <Text style={s.desc}>تواصل، شارك، وابثّ صوتاً وفيديو مع أصدقائك{'\n'}عبر شبكتك المحلية بدون إنترنت</Text>
 
         <View style={s.grid}>
-          {FEATURES.map(f => (
-            <TouchableOpacity key={f.label} style={s.cell} activeOpacity={0.7} onPress={f.onPress}>
-              <View style={[s.tile,{backgroundColor:f.bg}]}>
-                <Ionicons name={f.icon} size={30} color={f.color} />
-                {!!f.badge && (
-                  <View style={s.badge}><Text style={s.badgeTxt}>{f.badge > 9 ? '9+' : f.badge}</Text></View>
-                )}
-              </View>
-              <Text style={s.cellLbl}>{f.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {FEATURES.map((f, i) => <FeatureTile key={f.label} f={f} index={i} />)}
         </View>
       </ScrollView>
 
       <View style={s.footer}>
-        <TouchableOpacity style={s.btn} activeOpacity={0.85} onPress={()=>navigation.navigate('V2LoginScreen')}>
+        <PressableScale style={s.btn} onPress={()=>navigation.navigate('V2LoginScreen')}>
           <Text style={s.btnTxt}>ابدأ الآن</Text>
           <Ionicons name="arrow-back" size={20} color="#fff" style={{marginRight:8}} />
-        </TouchableOpacity>
+        </PressableScale>
         <TouchableOpacity onPress={()=>navigation.navigate('V2AdminLoginScreen')} style={{marginTop:12}}>
           <Text style={s.adminLink}>🛡️ دخول المسؤول</Text>
         </TouchableOpacity>
