@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Vibration, FlatList, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { getSocket } from '../../api/socket';
 
-const C = { bg:'#0B1120', surface:'#161F2E', elevated:'#1E2A3D', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', danger:'#EF4444', gold:'#FACC15', walkie:'#14B8A6', walkieBg:'#0F3B36' };
+const C = { bg:'#0B1120', surface:'#161F2E', elevated:'#1E2A3D', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', danger:'#EF4444', gold:'#FACC15', walkie:'#14B8A6', walkieBg:'#0F3B36', walkieDark:'#083330' };
 
 export default function V2WalkieScreen({ navigation }) {
   const sock = useRef(getSocket());
@@ -14,16 +15,26 @@ export default function V2WalkieScreen({ navigation }) {
   const soundRef = useRef(null);
   const startRef = useRef(0);
   const pulse = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
 
   const [isRecording, setIsRecording] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [log, setLog] = useState([]);
   const [toast, setToast] = useState('');
   const tT = useRef(null);
+  const toastAnim = useRef(new Animated.Value(0)).current;
 
-  const flash = (m) => { setToast(m); clearTimeout(tT.current); tT.current = setTimeout(()=>setToast(''),1900); };
+  const flash = (m) => {
+    setToast(m);
+    clearTimeout(tT.current);
+    Animated.spring(toastAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 10 }).start();
+    tT.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setToast(''));
+    }, 1900);
+  };
 
   useEffect(() => {
+    Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     Audio.requestPermissionsAsync();
     const s = sock.current;
 
@@ -60,6 +71,8 @@ export default function V2WalkieScreen({ navigation }) {
   }, [isRecording]);
 
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] });
 
   const startRecording = async () => {
     if (!enabled) { flash('🔇 التخاطب اللاسلكي معطّل حاليًا'); Vibration.vibrate(60); return; }
@@ -90,17 +103,28 @@ export default function V2WalkieScreen({ navigation }) {
     } catch (err) { flash('⚠️ خطأ أثناء الإرسال'); }
   };
 
-  const Row = ({ item }) => (
-    <View style={st.row}>
-      <View style={[st.av, { backgroundColor: item.color || C.walkie }]}><Text style={st.avT}>{(item.sender || '?').trim().charAt(0)}</Text></View>
-      <Text style={st.rowTxt}>{item.sender || 'مستخدم'} تحدّث الآن</Text>
-    </View>
-  );
+  const Row = ({ item, index }) => {
+    const rowFade = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+      Animated.timing(rowFade, { toValue: 1, duration: 300, delay: Math.min(index, 6) * 40, useNativeDriver: true }).start();
+    }, []);
+    return (
+      <Animated.View style={{ opacity: rowFade }}>
+        <View style={st.row}>
+          <View style={[st.av, { backgroundColor: item.color || C.walkie }]}><Text style={st.avT}>{(item.sender || '?').trim().charAt(0)}</Text></View>
+          <Text style={st.rowTxt}>{item.sender || 'مستخدم'} تحدّث الآن</Text>
+          <Ionicons name="volume-medium" size={16} color={C.walkie} />
+        </View>
+      </Animated.View>
+    );
+  };
 
   return (
     <SafeAreaView style={st.safe}>
       <View style={st.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="arrow-forward" size={24} color={C.sub} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="arrow-forward" size={24} color={C.sub} />
+        </TouchableOpacity>
         <Text style={st.hTitle}>التخاطب اللاسلكي</Text>
         <View style={[st.statusDot, { backgroundColor: enabled ? C.walkie : C.danger }]} />
       </View>
@@ -114,24 +138,42 @@ export default function V2WalkieScreen({ navigation }) {
         keyExtractor={i => i.id}
         renderItem={Row}
         contentContainerStyle={st.list}
-        ListEmptyComponent={<Text style={st.empty}>لسا ما تحدّث أحد 📻{'\n'}اضغط مطولًا على الزر بالأسفل للتحدث</Text>}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={st.emptyBox}>
+            <Ionicons name="radio-outline" size={40} color={C.muted} />
+            <Text style={st.empty}>لسا ما تحدّث أحد{'\n'}اضغط مطولًا على الزر بالأسفل للتحدث</Text>
+          </View>
+        }
       />
 
-      <View style={st.footer}>
-        <Animated.View style={[st.pulseRing, isRecording && { transform: [{ scale }] }]} />
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPressIn={startRecording}
-          onPressOut={stopRecording}
-          disabled={!enabled}
-          style={[st.talkBtn, isRecording && st.talkBtnActive, !enabled && st.talkBtnDisabled]}
-        >
-          <Ionicons name={isRecording ? 'mic' : 'radio'} size={32} color="#fff" />
-        </TouchableOpacity>
+      <Animated.View style={[st.footer, { opacity: fade }]}>
+        <View style={st.talkWrap}>
+          <Animated.View style={[st.pulseRing, { backgroundColor: isRecording ? C.danger : C.walkie, transform: [{ scale: ringScale }], opacity: isRecording ? ringOpacity : 0 }]} />
+          <Animated.View style={{ transform: [{ scale: isRecording ? scale : 1 }] }}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPressIn={startRecording}
+              onPressOut={stopRecording}
+              disabled={!enabled}
+            >
+              <LinearGradient
+                colors={enabled ? (isRecording ? ['#F87171', C.danger] : ['#2DD4BF', C.walkieDark]) : [C.muted, '#3A4452']}
+                style={st.talkBtn}
+              >
+                <Ionicons name={isRecording ? 'mic' : 'radio'} size={34} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
         <Text style={st.hint}>{isRecording ? 'جاري التسجيل... افلت للإرسال' : 'اضغط مطولًا للتحدث'}</Text>
-      </View>
+      </Animated.View>
 
-      {!!toast && <View style={st.toast}><Text style={st.toastTxt}>{toast}</Text></View>}
+      {!!toast && (
+        <Animated.View style={[st.toast, { opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
+          <Text style={st.toastTxt}>{toast}</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -144,16 +186,19 @@ const st = StyleSheet.create({
   disabledBanner: { flexDirection:'row', alignItems:'center', justifyContent:'center', backgroundColor:'#2A1414', paddingVertical:8, marginHorizontal:16, borderRadius:10, marginBottom:8 },
   disabledTxt: { color:C.danger, fontSize:12, fontWeight:'600', marginRight:6 },
   list: { padding:16, paddingBottom:20, flexGrow:1 },
-  empty: { color:C.muted, textAlign:'center', marginTop:60, fontSize:14, lineHeight:22 },
+  emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
+  empty: { color:C.muted, textAlign:'center', marginTop:14, fontSize:14, lineHeight:22 },
   row: { flexDirection:'row', alignItems:'center', backgroundColor:C.surface, borderRadius:14, padding:12, marginBottom:8, borderWidth:1, borderColor:C.border },
   av: { width:34, height:34, borderRadius:17, alignItems:'center', justifyContent:'center', marginLeft:10 },
   avT: { color:'#fff', fontWeight:'700' },
-  rowTxt: { color:C.text, fontSize:13 },
+  rowTxt: { color:C.text, fontSize:13, flex: 1 },
   footer: { alignItems:'center', paddingBottom:34, paddingTop:10 },
-  pulseRing: { position:'absolute', bottom:34, width:100, height:100, borderRadius:50, backgroundColor:C.walkie, opacity:0.25 },
-  talkBtn: { width:84, height:84, borderRadius:42, backgroundColor:C.walkie, alignItems:'center', justifyContent:'center', elevation:6 },
-  talkBtnActive: { backgroundColor:C.danger },
-  talkBtnDisabled: { backgroundColor:C.muted },
+  talkWrap: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
+  pulseRing: { position:'absolute', width:120, height:120, borderRadius:60 },
+  talkBtn: {
+    width:88, height:88, borderRadius:44, alignItems:'center', justifyContent:'center',
+    shadowColor: C.walkie, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 8,
+  },
   hint: { color:C.sub, fontSize:13, marginTop:14, fontWeight:'600' },
   toast: { position:'absolute', bottom:150, alignSelf:'center', backgroundColor:C.elevated, borderWidth:1, borderColor:C.walkie, borderRadius:14, paddingHorizontal:18, paddingVertical:10 },
   toastTxt: { color:C.text, fontSize:13, fontWeight:'600' },
