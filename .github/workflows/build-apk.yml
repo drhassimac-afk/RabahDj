@@ -1,4 +1,4 @@
-name: Build Debug APK (Dev with Metro)
+name: Build React Native Android APK
 
 on:
   push:
@@ -31,21 +31,29 @@ jobs:
       - name: 🏗️ Generate Android Folder
         run: npx expo prebuild --platform android
 
-      - name: 🛠️ Embed JS Bundle in Debug APK (Fallback)
+      - name: 🔑 Sign release build with debug key (for easy install/testing)
         run: |
-          cd android/app
-          sed -i '/^react {/a\    debuggableVariants = []' build.gradle
+          cat >> android/app/build.gradle << 'EOF'
 
-      - name: 🚀 Build Debug APK
+          android {
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+          EOF
+
+      - name: 🚀 Build Release APK
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: RabahDj-App-Debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: RabahDj-App-Release
+          path: android/app/build/outputs/apk/release/app-release.apk
