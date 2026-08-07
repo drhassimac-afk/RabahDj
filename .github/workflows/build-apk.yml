@@ -10,6 +10,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write # صلاحية ضرورية لكي يتمكن الأكشن من إنشاء وتحديث الـ Release
+
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v5
@@ -52,8 +55,20 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      - name: 📤 Upload APK
+      - name: 📤 Upload APK as Artifact
         uses: actions/upload-artifact@v5
         with:
           name: RabahDj-App-Release
           path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: 🚀 Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest # اسم التاج الثابت للـ Release
+          name: "Latest Pre-Release Build"
+          draft: false
+          prerelease: false
+          files: android/app/build/outputs/apk/release/app-release.apk
+          overwrite: true # لإجبار غيت هاب على حذف النسخة القديمة واستبدالها بالجديدة فوراً
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
