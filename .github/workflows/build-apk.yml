@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write # صلاحية ضرورية لكي يتمكن الأكشن من إنشاء وتحديث الـ Release
+      contents: write
 
     steps:
       - name: 📥 Checkout Repository
@@ -31,10 +31,16 @@ jobs:
       - name: 📦 Install Dependencies
         run: npm install --legacy-peer-deps
 
-      - name: 🏗️ Generate Android Folder
-        run: npx expo prebuild --platform android
+      - name: 🏗️ Generate Android Folder (Clean Build)
+        run: npx expo prebuild --platform android --clean
 
-      - name: 🔑 Sign release build with debug key (for easy install/testing)
+      # 🔴 الخطوة السحرية المفقودة: توليد حزمة الكود الحديثة وإدراجها في الأندرويد
+      - name: 📦 Bundle Assets & Latest JS Code
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
+      - name: 🔑 Sign release build with debug key
         run: |
           cat >> android/app/build.gradle << 'EOF'
 
@@ -64,11 +70,11 @@ jobs:
       - name: 🚀 Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest # اسم التاج الثابت للـ Release
+          tag_name: latest
           name: "Latest Pre-Release Build"
           draft: false
           prerelease: false
           files: android/app/build/outputs/apk/release/app-release.apk
-          overwrite: true # لإجبار غيت هاب على حذف النسخة القديمة واستبدالها بالجديدة فوراً
+          overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
