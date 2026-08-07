@@ -14,6 +14,8 @@ if (!fs.existsSync(file)) {
     process.exit(1);
 }
 const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+
+
 data.expo.android.versionCode = (data.expo.android.versionCode || 0) + 1;
 let v = data.expo.version.split('.');
 v[v.length-1] = parseInt(v[v.length-1]) + 1;
@@ -35,8 +37,12 @@ echo "📦 تجهيز الملفات وعمل Commit على Git..."
 git add .
 git commit -m "Build: Release v${VERSION_NAME} (Build ${VERSION_CODE})"
 
-# 4. دفع الكود إلى GitHub لتشغيل الـ Workflow المبني سابقاً
+# 4. جلب التحديثات الجديدة أولاً لمنع أخطاء الرفض ثم دفع الكود
+echo "📥 جاري فحص وجلب التحديثات من GitHub..."
+git pull origin main --rebase
+
 echo "🚀 جاري رفع التحديثات إلى GitHub..."
 git push origin main
 
 echo "🎉 تمت العملية بنجاح! اذهب الآن لتبويب Actions أو Releases في GitHub لتحميل الـ APK الجديد."
+
