@@ -2,7 +2,7 @@
   "expo": {
     "name": "RabahDj",
     "slug": "RabahDj",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -39,7 +39,7 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
-      "versionCode": 1
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"
