@@ -1,5 +1,80 @@
-      # 🟢 خطوة الـ Bundle الرسمية والمضمونة لمشاريع Expo
+name: Build React Native Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: ☕ Setup Java JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: 📦 Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: 🏗️ Generate Android Folder (Clean Build)
+        run: npx expo prebuild --platform android --clean
+
       - name: 📦 Bundle Assets & Latest JS Code
         run: |
           mkdir -p android/app/src/main/assets
-          npx expo export:embed --platform android --dev false --asset-catalog-dest android/app/src/main/res
+          npx expo export:embed --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+
+      - name: 🔑 Sign release build with debug key
+        run: |
+          cat >> android/app/build.gradle << 'EOF'
+
+          android {
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+          EOF
+
+      - name: 🚀 Build Release APK
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: 📤 Upload APK as Artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: RabahDj-App-Release
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: 🚀 Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest Pre-Release Build"
+          draft: false
+          prerelease: false
+          files: android/app/build/outputs/apk/release/app-release.apk
+          overwrite: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
