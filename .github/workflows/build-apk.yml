@@ -13,6 +13,11 @@ jobs:
     permissions:
       contents: write
 
+    # تضمن توجيه العمليات إلى مجلد التطبيق بدلاً من المجلد الرئيسي
+    defaults:
+      run:
+        working-directory: ./app
+
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v5
@@ -64,7 +69,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: RabahDj-App-Release
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: app/android/app/build/outputs/apk/release/app-release.apk
 
       - name: 🚀 Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
@@ -73,7 +78,7 @@ jobs:
           name: "Latest Pre-Release Build"
           draft: false
           prerelease: false
-          files: android/app/build/outputs/apk/release/app-release.apk
+          files: app/android/app/build/outputs/apk/release/app-release.apk
           overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
