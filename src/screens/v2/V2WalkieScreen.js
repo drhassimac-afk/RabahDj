@@ -19,6 +19,9 @@ export default function V2WalkieScreen({ navigation }) {
   const [enabled, setEnabled] = useState(true);
   const [log, setLog] = useState([]);
   const [toast, setToast] = useState('');
+  const [channels, setChannels] = useState(['عام', 'أصدقاء', 'عائلة']);
+  const [channelCounts, setChannelCounts] = useState({});
+  const [activeChannel, setActiveChannel] = useState('عام');
   const tT = useRef(null);
 
   const flash = (m) => { setToast(m); clearTimeout(tT.current); tT.current = setTimeout(()=>setToast(''),1900); };
@@ -42,12 +45,34 @@ export default function V2WalkieScreen({ navigation }) {
       } catch (err) { flash('⚠️ تعذّر تشغيل الصوت'); }
     };
     const onErr = (e) => { if (e && e.message) flash('⚠️ ' + e.message); };
+    const onChannelsUpdate = (data) => {
+      if (data?.channels) setChannels(data.channels);
+      if (data?.counts) setChannelCounts(data.counts);
+    };
 
     s.on('walkie_settings_update', onSettings);
     s.on('walkie_audio_received', onReceived);
     s.on('error', onErr);
-    return () => { s.off('walkie_settings_update', onSettings); s.off('walkie_audio_received', onReceived); s.off('error', onErr); };
+    s.on('walkie_channels_update', onChannelsUpdate);
+
+    // الانضمام للقناة الافتراضية عند فتح الشاشة
+    s.emit('join_walkie_channel', { channel: activeChannel });
+
+    return () => {
+      s.off('walkie_settings_update', onSettings);
+      s.off('walkie_audio_received', onReceived);
+      s.off('error', onErr);
+      s.off('walkie_channels_update', onChannelsUpdate);
+    };
   }, []);
+
+  const switchChannel = (channel) => {
+    if (channel === activeChannel) return;
+    sock.current.emit('join_walkie_channel', { channel });
+    setActiveChannel(channel);
+    setLog([]);
+    Vibration.vibrate(15);
+  };
 
   useEffect(() => {
     if (!isRecording) { pulse.setValue(0); return; }
@@ -109,6 +134,30 @@ export default function V2WalkieScreen({ navigation }) {
         <View style={st.disabledBanner}><Ionicons name="mic-off" size={16} color={C.danger} /><Text style={st.disabledTxt}>الميزة معطّلة حاليًا من الإدارة</Text></View>
       )}
 
+      <Text style={st.channelsTitle}>القنوات</Text>
+      <View style={st.channelsList}>
+        {channels.map((ch) => {
+          const isActive = ch === activeChannel;
+          return (
+            <TouchableOpacity
+              key={ch}
+              activeOpacity={0.8}
+              onPress={() => switchChannel(ch)}
+              style={[st.channelRow, isActive && st.channelRowActive]}
+            >
+              <View style={st.channelCount}>
+                <Ionicons name="people" size={14} color={isActive ? C.walkie : C.sub} />
+                <Text style={[st.channelCountTxt, isActive && { color: C.walkie }]}>{channelCounts[ch] ?? 0}</Text>
+              </View>
+              <View style={st.channelNameRow}>
+                <Text style={[st.channelName, isActive && { color: C.walkie }]}>القناة {ch === 'عام' ? 'العامة' : ch === 'أصدقاء' ? 'الأصدقاء' : 'العائلة'}</Text>
+                <Ionicons name={isActive ? 'radio' : 'radio-outline'} size={16} color={isActive ? C.walkie : C.muted} />
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <FlatList
         data={log}
         keyExtractor={i => i.id}
@@ -143,6 +192,14 @@ const st = StyleSheet.create({
   statusDot: { width:10, height:10, borderRadius:5 },
   disabledBanner: { flexDirection:'row', alignItems:'center', justifyContent:'center', backgroundColor:'#2A1414', paddingVertical:8, marginHorizontal:16, borderRadius:10, marginBottom:8 },
   disabledTxt: { color:C.danger, fontSize:12, fontWeight:'600', marginRight:6 },
+  channelsTitle: { color:C.sub, fontSize:12, fontWeight:'700', marginTop:6, marginBottom:8, marginHorizontal:16 },
+  channelsList: { marginHorizontal:16, marginBottom:6 },
+  channelRow: { flexDirection:'row-reverse', alignItems:'center', justifyContent:'space-between', backgroundColor:C.surface, borderRadius:14, paddingVertical:14, paddingHorizontal:16, marginBottom:8, borderWidth:1, borderColor:C.border },
+  channelRowActive: { borderColor:C.walkie, backgroundColor:C.walkieBg },
+  channelNameRow: { flexDirection:'row-reverse', alignItems:'center', gap:8 },
+  channelName: { color:C.text, fontSize:14, fontWeight:'700', marginLeft:8 },
+  channelCount: { flexDirection:'row-reverse', alignItems:'center', gap:4 },
+  channelCountTxt: { color:C.sub, fontSize:13, fontWeight:'700', marginRight:4 },
   list: { padding:16, paddingBottom:20, flexGrow:1 },
   empty: { color:C.muted, textAlign:'center', marginTop:60, fontSize:14, lineHeight:22 },
   row: { flexDirection:'row', alignItems:'center', backgroundColor:C.surface, borderRadius:14, padding:12, marginBottom:8, borderWidth:1, borderColor:C.border },

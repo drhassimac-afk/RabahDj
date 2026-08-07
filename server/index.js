@@ -107,6 +107,29 @@ let walkieSettings = { enabled: true, mutedUsers: [] };
 let streamRooms = {}; // { roomName: { broadcasterId: null, viewers: Set() } }
 
 // ========================================
+// ✅ قنوات التخاطب اللاسلكي
+// ========================================
+const WALKIE_CHANNELS = ['عام', 'أصدقاء', 'عائلة'];
+const DEFAULT_WALKIE_CHANNEL = 'عام';
+
+function getWalkieChannelCounts() {
+    const counts = {};
+    WALKIE_CHANNELS.forEach(ch => { counts[ch] = 0; });
+    activeUsers.forEach((u) => {
+        const ch = WALKIE_CHANNELS.includes(u.walkieChannel) ? u.walkieChannel : DEFAULT_WALKIE_CHANNEL;
+        counts[ch] = (counts[ch] || 0) + 1;
+    });
+    return counts;
+}
+
+function broadcastWalkieChannels() {
+    io.emit('walkie_channels_update', {
+        channels: WALKIE_CHANNELS,
+        counts: getWalkieChannelCounts(),
+    });
+}
+
+// ========================================
 // ✅ إصلاح: تهيئة قاعدة البيانات وإرجاع نتيجة
 // ========================================
 function initDatabase() {
@@ -386,7 +409,8 @@ io.on('connection', (socket) => {
 
         activeUsers.set(socket.id, {
             name: data.name.trim(),
-            avatarColor: data.avatarColor || '#1877F2'
+            avatarColor: data.avatarColor || '#1877F2',
+            walkieChannel: DEFAULT_WALKIE_CHANNEL
         });
 
         let savedPosts = [];
@@ -414,6 +438,7 @@ io.on('connection', (socket) => {
             });
         }
         socket.emit('walkie_settings_update', walkieSettings);
+        broadcastWalkieChannels();
     });
 
     // === تسجيل دخول الإدارة ===
@@ -639,17 +664,36 @@ io.on('connection', (socket) => {
 
 
     // === التالكي ووكي ===
+    socket.on('join_walkie_channel', (data) => {
+        const user = activeUsers.get(socket.id);
+        if (!user) return;
+        const channel = WALKIE_CHANNELS.includes(data?.channel) ? data.channel : DEFAULT_WALKIE_CHANNEL;
+        user.walkieChannel = channel;
+        activeUsers.set(socket.id, user);
+        socket.emit('walkie_channel_joined', { channel });
+        broadcastWalkieChannels();
+        console.log(`📻 ${user.name} انضم لقناة: ${channel}`);
+    });
+
     socket.on('walkie_audio', (data) => {
         const user = activeUsers.get(socket.id);
         if (!user) return;
         if (!walkieSettings.enabled) return;
         if (walkieSettings.mutedUsers.includes(user.name)) return;
 
-        socket.broadcast.emit('walkie_audio_received', {
-            sender: user.name,
-            avatarColor: user.avatarColor,
-            audioBase64: data.audioBase64,
-            duration: data.duration,
+        const channel = WALKIE_CHANNELS.includes(user.walkieChannel) ? user.walkieChannel : DEFAULT_WALKIE_CHANNEL;
+
+        activeUsers.forEach((otherUser, otherSocketId) => {
+            if (otherSocketId === socket.id) return;
+            const otherChannel = WALKIE_CHANNELS.includes(otherUser.walkieChannel) ? otherUser.walkieChannel : DEFAULT_WALKIE_CHANNEL;
+            if (otherChannel !== channel) return;
+            io.to(otherSocketId).emit('walkie_audio_received', {
+                sender: user.name,
+                avatarColor: user.avatarColor,
+                channel,
+                audioBase64: data.audioBase64,
+                duration: data.duration,
+            });
         });
     });
 
@@ -820,6 +864,7 @@ io.on('connection', (socket) => {
             console.log(`❌ ${user.name} غادر الشبكة`);
             activeUsers.delete(socket.id);
             broadcastOnlineUsers();
+            broadcastWalkieChannels();
         }
 
         if (currentBroadcaster && currentBroadcaster.id === socket.id) {
