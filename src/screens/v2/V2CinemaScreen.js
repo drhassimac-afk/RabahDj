@@ -1,4 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import {
   ActivityIndicator,
   Dimensions,
@@ -10,87 +15,182 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { SERVER_URL } from '../../api/config';
-import V2_THEME from '../../theme/v2Theme';
 
-const C = V2_THEME.colors;
-const S = V2_THEME.spacing;
-const R = V2_THEME.radius;
-const SH = V2_THEME.shadows;
+import {
+  Ionicons,
+} from '@expo/vector-icons';
+
+import {
+  useVideoPlayer,
+  VideoView,
+} from 'expo-video';
+
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+
+import {
+  SERVER_URL,
+} from '../../api/config';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 44) / 2;
 
-const CATEGORIES = ['الكل', 'أفلام', 'كوميديا', 'مسلسلات', 'وثائقي'];
+const C = {
+  bg: '#0B1120',
+  surface: '#161F2E',
+  border: '#243044',
+  primary: '#3B82F6',
+  text: '#FFFFFF',
+  sub: '#94A3B8',
+  muted: '#64748B',
+  danger: '#EF4444',
+};
+
+const SAMPLE_A =
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
+const SAMPLE_B =
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4';
 
 const DEMO_ITEMS = [
   {
     id: 'demo-1',
-    title: 'Big Buck Bunny',
+    title: 'Big Buck Bunny - تجريبي',
     genre: 'رسوم متحركة',
     duration: 'تجريبي',
     category: 'أفلام',
     emoji: '🎬',
-    color: '#2F3B7A',
-    video: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    color: '#2E3A6B',
+    video: SAMPLE_A,
   },
   {
     id: 'demo-2',
-    title: 'Elephants Dream',
+    title: 'Elephants Dream - تجريبي',
     genre: 'خيال',
     duration: 'تجريبي',
     category: 'أفلام',
     emoji: '🎞️',
     color: '#6B5B1E',
-    video: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    video: SAMPLE_B,
   },
 ];
 
+const CATEGORIES = [
+  'الكل',
+  'أفلام',
+  'كوميديا',
+  'مسلسلات',
+  'وثائقي',
+];
+
 function getCategory(fileName) {
-  const n = fileName.toLowerCase();
-  if (n.includes('comedy') || n.includes('كوميديا') || n.includes('ضحك')) return 'كوميديا';
-  if (n.includes('series') || n.includes('episode') || n.includes('مسلسل')) return 'مسلسلات';
-  if (n.includes('documentary') || n.includes('وثائقي') || n.includes('nature')) return 'وثائقي';
+  const name = fileName.toLowerCase();
+
+  if (
+    name.includes('comedy') ||
+    name.includes('comedic') ||
+    name.includes('k comedy') ||
+    name.includes('كوميديا') ||
+    name.includes('ضحك')
+  ) {
+    return 'كوميديا';
+  }
+
+  if (
+    name.includes('series') ||
+    name.includes('episode') ||
+    name.includes('مسلسل') ||
+    name.includes('حلقة')
+  ) {
+    return 'مسلسلات';
+  }
+
+  if (
+    name.includes('documentary') ||
+    name.includes('document') ||
+    name.includes('doc_') ||
+    name.includes('وثائقي')
+  ) {
+    return 'وثائقي';
+  }
+
   return 'أفلام';
 }
 
-function getEmoji(cat) {
-  if (cat === 'كوميديا') return '😂';
-  if (cat === 'مسلسلات') return '🎭';
-  if (cat === 'وثائقي') return '🌍';
+function getEmoji(category) {
+  if (category === 'كوميديا') {
+    return '😂';
+  }
+
+  if (category === 'مسلسلات') {
+    return '🎭';
+  }
+
+  if (category === 'وثائقي') {
+    return '🌍';
+  }
+
   return '🎬';
 }
 
-function getColor(cat) {
-  if (cat === 'كوميديا') return '#6D2E7A';
-  if (cat === 'مسلسلات') return '#7A2E2E';
-  if (cat === 'وثائقي') return '#1E6B3A';
-  return '#30457C';
+function getColor(category) {
+  if (category === 'كوميديا') {
+    return '#5B2E6B';
+  }
+
+  if (category === 'مسلسلات') {
+    return '#6B2E2E';
+  }
+
+  if (category === 'وثائقي') {
+    return '#1E6B3A';
+  }
+
+  return '#2E4A6B';
 }
 
 function getTitle(fileName) {
-  return fileName.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+  return fileName
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
 }
 
 function normalizeServerFiles(data) {
-  const files = Array.isArray(data) ? data : data?.files || data?.media || [];
+  const files = Array.isArray(data)
+    ? data
+    : data?.files || data?.media || [];
+
   return files
-    .map((f, i) => {
-      const name = typeof f === 'string' ? f : f?.name || f?.filename || f?.file;
-      if (!name) return null;
-      const cat = getCategory(name);
+    .map((file, index) => {
+      const fileName =
+        typeof file === 'string'
+          ? file
+          : file?.name ||
+            file?.filename ||
+            file?.file;
+
+      if (!fileName) {
+        return null;
+      }
+
+      const category = getCategory(fileName);
+
       return {
-        id: `srv-${i}-${name}`,
-        title: getTitle(name),
-        genre: cat,
+        id: `server-${fileName}-${index}`,
+        title: getTitle(fileName),
+        genre: category,
         duration: 'من الشبكة',
-        category: cat,
-        emoji: getEmoji(cat),
-        color: getColor(cat),
-        video: `${SERVER_URL}/media/${encodeURIComponent(name)}`,
+        category,
+        emoji: getEmoji(category),
+        color: getColor(category),
+
+        // نبني الرابط من SERVER_URL حتى لا نستخدم IP خاطئًا
+        video:
+          `${SERVER_URL}/media/` +
+          encodeURIComponent(fileName),
+
         remote: true,
       };
     })
@@ -98,16 +198,47 @@ function normalizeServerFiles(data) {
 }
 
 function PlayerModal({ item, onClose }) {
-  const player = useVideoPlayer(item.video, (vp) => vp.play());
+  const player = useVideoPlayer(
+    item.video,
+    (videoPlayer) => {
+      videoPlayer.play();
+    }
+  );
+
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <SafeAreaView style={stylesPlayer.container}>
-        <TouchableOpacity style={stylesPlayer.closeBtn} onPress={onClose}>
-          <Ionicons name="close" size={30} color="#fff" />
+    <Modal
+      visible
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={playerStyles.container}>
+        <TouchableOpacity
+          style={playerStyles.closeButton}
+          onPress={onClose}
+        >
+          <Ionicons
+            name="close-circle"
+            size={38}
+            color="#FFFFFF"
+          />
         </TouchableOpacity>
-        <VideoView style={stylesPlayer.video} player={player} nativeControls contentFit="contain" allowsFullscreen allowsPictureInPicture />
-        <Text style={stylesPlayer.title}>{item.title}</Text>
-        <Text style={stylesPlayer.subtitle}>{item.category} · {item.genre}</Text>
+
+        <VideoView
+          style={playerStyles.video}
+          player={player}
+          nativeControls
+          contentFit="contain"
+          allowsFullscreen
+          allowsPictureInPicture
+        />
+
+        <Text style={playerStyles.title}>
+          {item.title}
+        </Text>
+
+        <Text style={playerStyles.subtitle}>
+          {item.category} · {item.genre}
+        </Text>
       </SafeAreaView>
     </Modal>
   );
@@ -115,6 +246,7 @@ function PlayerModal({ item, onClose }) {
 
 export default function V2CinemaScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+
   const [category, setCategory] = useState('الكل');
   const [playing, setPlaying] = useState(null);
   const [serverItems, setServerItems] = useState([]);
@@ -123,159 +255,315 @@ export default function V2CinemaScreen({ navigation }) {
 
   useEffect(() => {
     let mounted = true;
-    async function load() {
+
+    async function loadMedia() {
       try {
         setLoading(true);
         setServerError('');
-        const res = await fetch(`${SERVER_URL}/media-list`);
-        if (!res.ok) throw new Error('fail');
-        const data = await res.json();
-        if (mounted) setServerItems(normalizeServerFiles(data));
-      } catch (e) {
-        console.log('Cinema load error:', e);
-        if (mounted) setServerError('تعذر تحميل ملفات السيرفر');
+
+        const response = await fetch(
+          `${SERVER_URL}/media-list`
+        );
+
+        if (!response.ok) {
+          throw new Error('media-list request failed');
+        }
+
+        const data = await response.json();
+        const items = normalizeServerFiles(data);
+
+        if (mounted) {
+          setServerItems(items);
+        }
+      } catch (error) {
+        console.log('Cinema media error:', error);
+
+        if (mounted) {
+          setServerError(
+            'تعذر تحميل ملفات السيرفر'
+          );
+        }
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
-    load();
-    return () => { mounted = false; };
+
+    loadMedia();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const all = useMemo(() => [...DEMO_ITEMS, ...serverItems], [serverItems]);
-  const filtered = useMemo(() => (category === 'الكل' ? all : all.filter((i) => i.category === category)), [all, category]);
+  const allItems = useMemo(() => {
+    return [
+      ...DEMO_ITEMS,
+      ...serverItems,
+    ];
+  }, [serverItems]);
 
-  const renderItem = useCallback(({ item }) => (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      style={[styles.card, { backgroundColor: item.color }]}
-      onPress={() => setPlaying(item)}
-    >
-      <View style={styles.cardBody}>
-        <Text style={styles.emoji}>{item.emoji}</Text>
-        {item.remote && (
-          <View style={styles.badge}>
-            <Ionicons name="wifi" size={12} color="#fff" />
-            <Text style={styles.badgeText}>الشبكة</Text>
-          </View>
-        )}
-      </View>
-      <View style={styles.cardFooter}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.cardSub} numberOfLines={1}>{item.duration} · {item.genre}</Text>
-      </View>
-    </TouchableOpacity>
-  ), []);
+  const filteredItems = useMemo(() => {
+    if (category === 'الكل') {
+      return allItems;
+    }
+
+    return allItems.filter(
+      (item) => item.category === category
+    );
+  }, [allItems, category]);
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={26} color="#fff" />
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons
+              name="arrow-forward"
+              size={30}
+              color="#FFFFFF"
+            />
           </TouchableOpacity>
-          <Text style={styles.title}>سينما وتلفاز</Text>
-          <View style={{ width: 28 }} />
+
+          <Text style={styles.headerTitle}>
+            سينما وتلفاز
+          </Text>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {CATEGORIES.map((cat) => (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categories}
+        >
+          {CATEGORIES.map((itemCategory) => (
             <TouchableOpacity
-              key={cat}
-              onPress={() => setCategory(cat)}
-              style={[styles.chip, category === cat && styles.chipActive]}
+              key={itemCategory}
+              onPress={() =>
+                setCategory(itemCategory)
+              }
+              style={[
+                styles.categoryButton,
+                category === itemCategory &&
+                  styles.categoryButtonActive,
+              ]}
             >
-              <Text style={[styles.chipText, category === cat && styles.chipTextActive]} numberOfLines={1}>
-                {cat}
+              <Text
+                style={[
+                  styles.categoryText,
+                  category === itemCategory &&
+                    styles.categoryTextActive,
+                ]}
+              >
+                {itemCategory}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
         <View style={styles.infoRow}>
-          <Text style={styles.infoText}>المتاح على شبكتك ({filtered.length})</Text>
-          {loading && <ActivityIndicator size="small" color={C.primary} />}
+          <Text style={styles.countText}>
+            المتاح على شبكتك (
+            {filteredItems.length}
+            )
+          </Text>
+
+          {loading && (
+            <ActivityIndicator
+              size="small"
+              color={C.primary}
+            />
+          )}
         </View>
 
-        {!!serverError && <Text style={styles.errorText}>{serverError}</Text>}
+        {!!serverError && (
+          <Text style={styles.errorText}>
+            {serverError}
+          </Text>
+        )}
 
         <FlatList
-          data={filtered}
-          keyExtractor={(i) => i.id}
+          data={filteredItems}
+          keyExtractor={(item) => item.id}
           numColumns={2}
-          renderItem={renderItem}
-          columnWrapperStyle={styles.column}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.grid, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={[
+            styles.grid,
+            {
+              paddingBottom: insets.bottom + 45,
+            },
+          ]}
+          columnWrapperStyle={styles.column}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.card,
+                {
+                  backgroundColor: item.color,
+                },
+              ]}
+              onPress={() => setPlaying(item)}
+            >
+              <View style={styles.cardImage}>
+                <Text style={styles.emoji}>
+                  {item.emoji}
+                </Text>
+
+                {item.remote && (
+                  <View style={styles.networkBadge}>
+                    <Ionicons
+                      name="wifi"
+                      size={13}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.networkText}>
+                      الشبكة
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.cardFooter}>
+                <Text
+                  style={styles.cardTitle}
+                  numberOfLines={1}
+                >
+                  {item.title}
+                </Text>
+
+                <Text style={styles.cardSub}>
+                  {item.duration} · {item.genre}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="film-outline" size={48} color={C.textDim} />
-              <Text style={styles.emptyTitle}>لا يوجد محتوى</Text>
-              <Text style={styles.emptySub}>أضف ملفات MP4 إلى مجلد media</Text>
+            <View style={styles.emptyBox}>
+              <Ionicons
+                name="film-outline"
+                size={42}
+                color={C.muted}
+              />
+
+              <Text style={styles.emptyText}>
+                لا يوجد محتوى في هذا التصنيف
+              </Text>
+
+              <Text style={styles.emptyHint}>
+                أضف ملفات MP4 إلى مجلد server/media
+              </Text>
             </View>
           }
         />
 
-        {playing && <PlayerModal item={playing} onClose={() => setPlaying(null)} />}
+        {playing && (
+          <PlayerModal
+            key={playing.id}
+            item={playing}
+            onClose={() => setPlaying(null)}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
 }
 
+const CARD_WIDTH = (width - 48) / 2;
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
-  container: { flex: 1, backgroundColor: C.bg },
+  safe: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+
+  container: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
 
   header: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  backBtn: { padding: 4 },
-  title: { color: C.text, fontSize: 24, fontWeight: '800', textAlign: 'right' },
 
-  chips: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 6,
-    alignItems: 'center',
+  backButton: {
+    padding: 5,
   },
-  chip: {
+
+  headerTitle: {
+    flex: 1,
+    color: C.text,
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'right',
+    marginRight: 15,
+  },
+
+  categories: {
+    flexDirection: 'row-reverse',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+
+  categoryButton: {
     backgroundColor: C.surface,
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: C.borderSoft,
-    minWidth: 72,
-    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 17,
+    paddingVertical: 10,
+    marginLeft: 8,
   },
-  chipActive: {
+
+  categoryButtonActive: {
     backgroundColor: C.primary,
-    borderColor: C.primary,
   },
-  chipText: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
-  chipTextActive: { color: C.white },
+
+  categoryText: {
+    color: C.sub,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  categoryTextActive: {
+    color: '#FFFFFF',
+  },
 
   infoRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    marginTop: 8,
+    paddingHorizontal: 20,
+    marginTop: 4,
     marginBottom: 8,
   },
-  infoText: { color: C.textMuted, fontSize: 13, fontWeight: '600' },
-  errorText: { color: C.danger, textAlign: 'center', fontSize: 12, marginBottom: 8 },
+
+  countText: {
+    color: C.sub,
+    fontSize: 13,
+    textAlign: 'right',
+  },
+
+  errorText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
 
   grid: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingTop: 4,
   },
-  column: { justifyContent: 'space-between' },
+
+  column: {
+    justifyContent: 'space-between',
+  },
 
   card: {
     width: CARD_WIDTH,
@@ -283,83 +571,107 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 14,
-    ...SH.card,
   },
-  cardBody: {
+
+  cardImage: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  empty: {
+
+  emoji: {
+    fontSize: 54,
+  },
+
+  networkBadge: {
+    position: 'absolute',
+    top: 9,
+    left: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+
+  networkText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    marginLeft: 3,
+  },
+
+  cardFooter: {
+    backgroundColor: 'rgba(11,17,32,0.72)',
+    padding: 10,
+  },
+
+  cardTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'right',
+  },
+
+  cardSub: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: 3,
+  },
+
+  emptyBox: {
     alignItems: 'center',
     paddingTop: 80,
     paddingHorizontal: 20,
   },
-  emptyTitle: { color: C.textMuted, fontSize: 15, marginTop: 12 },
-  emptySub: { color: C.textDim, fontSize: 12, marginTop: 6 },
 
-  emoji: { fontSize: 54 },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+  emptyText: {
+    color: C.sub,
+    fontSize: 15,
+    marginTop: 12,
+    textAlign: 'center',
   },
-  badgeText: { color: C.white, fontSize: 9, marginRight: 3, fontWeight: '700' },
 
-  cardFooter: {
-    backgroundColor: 'rgba(7,11,20,0.75)',
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-  },
-  cardTitle: {
-    color: C.text,
-    fontSize: 14,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  cardSub: {
-    color: C.textMuted,
-    fontSize: 11,
-    textAlign: 'right',
-    marginTop: 2,
+  emptyHint: {
+    color: C.muted,
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 
-const stylesPlayer = StyleSheet.create({
+const playerStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
   },
-  closeBtn: {
+
+  closeButton: {
     alignSelf: 'flex-start',
-    padding: 16,
-    zIndex: 10,
+    padding: 12,
   },
+
   video: {
     width: '100%',
     height: 300,
-    backgroundColor: '#000',
+    marginTop: 25,
   },
+
   title: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: 'bold',
     textAlign: 'center',
     marginTop: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
   },
+
   subtitle: {
-    color: '#8a93ab',
+    color: '#94A3B8',
     fontSize: 13,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: 8,
   },
 });
