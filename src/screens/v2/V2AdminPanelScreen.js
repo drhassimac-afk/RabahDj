@@ -12,6 +12,7 @@ export default function V2AdminPanelScreen({ navigation }) {
   const [walkie, setWalkie] = useState({ enabled:true, mutedUsers:[] });
   const [postsCount, setPosts] = useState(0);
   const [connected, setConn] = useState(false);
+  const [serverStats, setServerStats] = useState({ connected: 0, posts: 0, streams: 0, cpu: 0, ram: 0 });
   const [toast, setToast] = useState('');
   const toastT = useRef(null);
   const [pinModal, setPinModal] = useState(false);
@@ -36,12 +37,14 @@ export default function V2AdminPanelScreen({ navigation }) {
       if (r && r.ok) { flash('✅ تم تغيير الرمز'); setPinModal(false); setOldPin(''); setNewPin(''); setPinMsg(''); }
       else setPinMsg(r && r.reason === 'old' ? 'الرمز القديم غير صحيح' : r && r.reason === 'format' ? 'الرمز الجديد 4-8 أرقام' : 'فشل التغيير');
     };
+    const onStats = (s) => { if (s) setServerStats(s); };
     s.on('init', onInit); s.on('onlineUsers', onUsers); s.on('walkie_settings_update', onWalkie);
     s.on('postAdded', onPostAdd); s.on('postDeleted', onPostDel);
     s.on('connect', onConn); s.on('disconnect', onDisc); s.on('error', onErr);
     s.on('admin_change_pin_result', onPinRes);
+    s.on('admin_stats', onStats);
     setConn(s.connected);
-    return () => { ['init','onlineUsers','walkie_settings_update','postAdded','postDeleted','connect','disconnect','error','admin_change_pin_result'].forEach(ev => s.off(ev)); };
+    return () => { ['init','onlineUsers','walkie_settings_update','postAdded','postDeleted','connect','disconnect','error','admin_change_pin_result','admin_stats'].forEach(ev => s.off(ev)); };
   }, []);
 
   const token = getAdminToken();
@@ -87,6 +90,24 @@ export default function V2AdminPanelScreen({ navigation }) {
           <Stat icon="document-text" label="منشورات" value={postsCount} color={C.gold} />
           <Stat icon="mic" label="مكتومون" value={(walkie.mutedUsers||[]).length} color={C.danger} />
         </View>
+
+        <Card title="حالة الخادم" icon="server-outline">
+          <View style={st.row}>
+            <Text style={st.rowTxt}>حالة السيرفر</Text>
+            <View style={st.statusPill}><Text style={st.statusPillTxt}>{connected ? 'يعمل' : 'متوقف'}</Text></View>
+          </View>
+          <View style={{marginTop:14}}>
+            <View style={st.barRow}><Text style={st.barLabel}>المعالج CPU</Text><Text style={st.barValue}>{serverStats.cpu}%</Text></View>
+            <View style={st.barTrack}><View style={[st.barFill,{width:`${Math.min(100,serverStats.cpu)}%`,backgroundColor:C.success}]} /></View>
+          </View>
+          <View style={{marginTop:12}}>
+            <View style={st.barRow}><Text style={st.barLabel}>ذاكرة RAM</Text><Text style={st.barValue}>{serverStats.ram}%</Text></View>
+            <View style={st.barTrack}><View style={[st.barFill,{width:`${Math.min(100,serverStats.ram)}%`,backgroundColor:C.primary}]} /></View>
+          </View>
+          <View style={st.miniStatsRow}>
+            <Text style={st.miniStat}>📡 بثوث نشطة: {serverStats.streams}</Text>
+          </View>
+        </Card>
 
         <Card title="التخاطب اللاسلكي" icon="walkie-talkie">
           <View style={st.row}><Text style={st.rowTxt}>تفعيل الميزة للجميع</Text>
@@ -163,6 +184,15 @@ const st = StyleSheet.create({
   statIcon:{width:40,height:40,borderRadius:12,alignItems:'center',justifyContent:'center',marginBottom:8},
   statVal:{color:C.text,fontSize:22,fontWeight:'800'}, statLbl:{color:C.sub,fontSize:12,marginTop:2},
   card:{backgroundColor:C.surface,borderRadius:18,padding:16,marginBottom:14,borderWidth:1,borderColor:C.border},
+  statusPill:{backgroundColor:C.success+'22',borderRadius:10,paddingHorizontal:10,paddingVertical:4},
+  statusPillTxt:{color:C.success,fontSize:12,fontWeight:'700'},
+  barRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:6},
+  barLabel:{color:C.sub,fontSize:12,fontWeight:'600'},
+  barValue:{color:C.text,fontSize:12,fontWeight:'700'},
+  barTrack:{height:8,borderRadius:4,backgroundColor:C.elevated,overflow:'hidden'},
+  barFill:{height:8,borderRadius:4},
+  miniStatsRow:{marginTop:14,borderTopWidth:1,borderTopColor:C.border,paddingTop:10},
+  miniStat:{color:C.sub,fontSize:12,fontWeight:'600'},
   cardHead:{flexDirection:'row',alignItems:'center',marginBottom:12}, cardTitle:{color:C.text,fontSize:15,fontWeight:'700',marginRight:8},
   row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, rowTxt:{color:C.text,fontSize:15},
   empty:{color:C.muted,fontSize:13,textAlign:'center',paddingVertical:10},

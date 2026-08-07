@@ -439,6 +439,7 @@ io.on('connection', (socket) => {
         }
         socket.emit('walkie_settings_update', walkieSettings);
         broadcastWalkieChannels();
+        socket.emit('admin_stats', getServerStats());
     });
 
     // === تسجيل دخول الإدارة ===
@@ -902,6 +903,49 @@ function startServerBroadcast() {
         console.warn('⚠️ Bonjour غير متاح على هذا الجهاز:', error.message);
     }
 }
+
+// ========================================
+// ✅ بث إحصائيات السيرفر الحية للوحة الإدارة
+// ========================================
+function getServerStats() {
+    let postsCount = 0;
+    try {
+        if (isDbReady()) postsCount = db.get('posts').size().value();
+    } catch (err) { /* تجاهل */ }
+
+    let activeStreams = 0;
+    Object.keys(streamRooms).forEach((room) => {
+        if (streamRooms[room] && streamRooms[room].broadcasterId) activeStreams += 1;
+    });
+
+    let cpuPercent = 0;
+    try {
+        const cpus = os.cpus() || [];
+        const load = os.loadavg ? os.loadavg()[0] : 0;
+        cpuPercent = cpus.length ? Math.min(100, Math.round((load / cpus.length) * 100)) : 0;
+    } catch (err) { cpuPercent = 0; }
+
+    let ramPercent = 0;
+    try {
+        const total = os.totalmem();
+        const free = os.freemem();
+        ramPercent = total ? Math.round(((total - free) / total) * 100) : 0;
+    } catch (err) { ramPercent = 0; }
+
+    return {
+        connected: activeUsers.size,
+        posts: postsCount,
+        streams: activeStreams,
+        cpu: cpuPercent,
+        ram: ramPercent,
+    };
+}
+
+setInterval(() => {
+    try {
+        io.emit('admin_stats', getServerStats());
+    } catch (err) { /* تجاهل أي خطأ حتى لا يوقف السيرفر */ }
+}, 3000);
 
 // ========================================
 // ✅ إصلاح: ترتيب التشغيل الصحيح
