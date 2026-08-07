@@ -2,37 +2,30 @@
   "expo": {
     "name": "rabahdj",
     "slug": "RabahDjNew",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0B1120"
     },
-
     "assetBundlePatterns": [
       "**/*"
     ],
-
     "ios": {
       "supportsTablet": true,
       "bitcode": false
     },
-
     "android": {
       "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": false,
-
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B1120"
       },
-
       "package": "com.rabahdfd.rabahdj",
-
       "permissions": [
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.CAMERA",
@@ -42,9 +35,9 @@
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH"
-      ]
+      ],
+      "versionCode": 2
     },
-
     "plugins": [
       [
         "@config-plugins/react-native-webrtc",
@@ -65,13 +58,11 @@
         }
       ]
     ],
-
     "extra": {
       "eas": {
         "projectId": "0f7210ea-9733-4d38-9061-83fb4ac91d9e"
       }
     },
-
     "owner": "rabahdj-new"
   }
 }
