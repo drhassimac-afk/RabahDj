@@ -75,7 +75,7 @@ jobs:
           draft: false
           prerelease: false
           files: android/app/build/outputs/apk/release/app-release.apk
-          overwrite: true
+          overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
