@@ -2,7 +2,7 @@
   "expo": {
     "name": "rabahdj",
     "slug": "RabahDjNew",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -36,7 +36,7 @@
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH"
       ],
-      "versionCode": 6
+      "versionCode": 7
     },
     "plugins": [
       [
