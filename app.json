@@ -38,25 +38,33 @@
       "versionCode": 8
     },
     "plugins": [
-      [
-        "@config-plugins/react-native-webrtc",
-        {
-          "cameraPermission": "Allow RabahDj to access your camera",
-          "microphonePermission": "Allow RabahDj to access your microphone"
-        }
-      ],
-      [
-        "expo-navigation-bar",
-        {
-          "position": "relative",
-          "visibility": "visible",
-          "behavior": "inset-touch",
-          "barStyle": "light",
-          "backgroundColor": "#0B1120",
-          "borderColor": "#0B1120"
-        }
-      ]
-    ],
+  [
+    "@config-plugins/react-native-webrtc",
+    {
+      "cameraPermission": "Allow RabahDj to access your camera",
+      "microphonePermission": "Allow RabahDj to access your microphone"
+    }
+  ],
+  [
+    "expo-navigation-bar",
+    {
+      "position": "relative",
+      "visibility": "visible",
+      "behavior": "inset-touch",
+      "barStyle": "light",
+      "backgroundColor": "#0B1120",
+      "borderColor": "#0B1120"
+    }
+  ],
+  [
+    "expo-build-properties",
+    {
+      "android": {
+        "usesCleartextTraffic": true
+      }
+    }
+  ]
+],
     "extra": {
       "eas": {
         "projectId": "0f7210ea-9733-4d38-9061-83fb4ac91d9e"
