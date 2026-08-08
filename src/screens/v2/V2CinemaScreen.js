@@ -20,6 +20,8 @@ import {
   Ionicons,
 } from '@expo/vector-icons';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {
   useVideoPlayer,
   VideoView,
@@ -63,6 +65,7 @@ const DEMO_ITEMS = [
     emoji: '🎬',
     color: '#2E3A6B',
     video: SAMPLE_A,
+    rating: getRating('Big Buck Bunny'),
   },
   {
     id: 'demo-2',
@@ -73,6 +76,7 @@ const DEMO_ITEMS = [
     emoji: '🎞️',
     color: '#6B5B1E',
     video: SAMPLE_B,
+    rating: getRating('Elephants Dream'),
   },
 ];
 
@@ -157,6 +161,18 @@ function getTitle(fileName) {
     .trim();
 }
 
+function getRating(seed) {
+  // تقييم ثابت لكل عنصر مبني على اسمه (بدل رقم عشوائي يتغيّر كل مرة)
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) % 1000;
+  }
+  const rating = 3.8 + (hash % 12) / 10; // بين 3.8 و 4.9
+  return Math.round(rating * 10) / 10;
+}
+
+const FAVORITES_KEY = 'rabahdj_cinema_favorites';
+
 function normalizeServerFiles(data) {
   const files = Array.isArray(data)
     ? data
@@ -185,6 +201,7 @@ function normalizeServerFiles(data) {
         category,
         emoji: getEmoji(category),
         color: getColor(category),
+        rating: getRating(fileName),
 
         // نبني الرابط من SERVER_URL حتى لا نستخدم IP خاطئًا
         video:
@@ -252,6 +269,25 @@ export default function V2CinemaScreen({ navigation }) {
   const [serverItems, setServerItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [serverError, setServerError] = useState('');
+  const [favorites, setFavorites] = useState([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(FAVORITES_KEY)
+      .then((raw) => {
+        if (raw) setFavorites(JSON.parse(raw));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleFavorite = (id) => {
+    setFavorites((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((f) => f !== id)
+        : [...prev, id];
+      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -332,6 +368,14 @@ export default function V2CinemaScreen({ navigation }) {
           <Text style={styles.headerTitle}>
             سينما وتلفاز
           </Text>
+
+          <View style={styles.headerBadge}>
+            <Ionicons
+              name="film"
+              size={20}
+              color="#FFFFFF"
+            />
+          </View>
         </View>
 
         <ScrollView
@@ -400,15 +444,22 @@ export default function V2CinemaScreen({ navigation }) {
           renderItem={({ item }) => (
             <TouchableOpacity
               activeOpacity={0.8}
-              style={[
-                styles.card,
-                {
-                  backgroundColor: item.color,
-                },
-              ]}
+              style={styles.card}
               onPress={() => setPlaying(item)}
             >
               <View style={styles.cardImage}>
+                <TouchableOpacity
+                  style={styles.favButton}
+                  onPress={() => toggleFavorite(item.id)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name={favorites.includes(item.id) ? 'heart' : 'heart-outline'}
+                    size={18}
+                    color={favorites.includes(item.id) ? C.danger : '#FFFFFF'}
+                  />
+                </TouchableOpacity>
+
                 <Text style={styles.emoji}>
                   {item.emoji}
                 </Text>
@@ -435,9 +486,10 @@ export default function V2CinemaScreen({ navigation }) {
                   {item.title}
                 </Text>
 
-                <Text style={styles.cardSub}>
-                  {item.duration} · {item.genre}
-                </Text>
+                <View style={styles.ratingRow}>
+                  <Ionicons name="star" size={12} color="#FACC15" />
+                  <Text style={styles.ratingText}>{item.rating}</Text>
+                </View>
               </View>
             </TouchableOpacity>
           )}
@@ -506,6 +558,15 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
 
+  headerBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: C.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   categories: {
     flexDirection: 'row-reverse',
     paddingHorizontal: 16,
@@ -571,6 +632,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 14,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+
+  favButton: {
+    position: 'absolute',
+    top: 9,
+    right: 9,
+    zIndex: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   cardImage: {
@@ -614,11 +691,18 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  cardSub: {
-    color: '#CBD5E1',
-    fontSize: 11,
-    textAlign: 'right',
-    marginTop: 3,
+  ratingRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+
+  ratingText: {
+    color: '#FACC15',
+    fontSize: 12,
+    fontWeight: '700',
+    marginRight: 4,
   },
 
   emptyBox: {
