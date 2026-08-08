@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Vibration } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getSocket } from '../../api/socket';
 
 const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#A855F7', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', gold:'#FACC15', danger:'#EF4444', success:'#22C55E' };
 
@@ -50,6 +51,7 @@ function CardTile({ card, onPress, disabled }) {
 }
 
 export default function V2MemoryGameScreen({ navigation }) {
+  const sock = useRef(getSocket());
   const [cards, setCards] = useState(shuffledDeck);
   const [flippedIdx, setFlippedIdx] = useState([]);
   const [moves, setMoves] = useState(0);
@@ -71,6 +73,8 @@ export default function V2MemoryGameScreen({ navigation }) {
       setWon(true);
       clearInterval(timerRef.current);
       Vibration.vibrate([0, 40, 60, 40]);
+      const points = Math.max(20, 100 - moves * 3);
+      sock.current.emit('game_score_submit', { points, game: 'memory' });
     }
   }, [cards]);
 

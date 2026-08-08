@@ -63,6 +63,7 @@ function PressableScale({ style, onPress, disabled, children }) {
 export default function V2GamesScreen({ navigation }) {
   const sock = useRef(getSocket());
   const [onlineCount, setOnlineCount] = useState(0);
+  const [leaderboard, setLeaderboard] = useState([]);
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -70,9 +71,12 @@ export default function V2GamesScreen({ navigation }) {
     const s = sock.current;
     const onInit = (d) => setOnlineCount((d.onlineUsers || []).length);
     const onUsers = (list) => setOnlineCount((list || []).length);
+    const onLeaderboard = (d) => setLeaderboard(d?.leaderboard || []);
     s.on('init', onInit);
     s.on('onlineUsers', onUsers);
-    return () => { s.off('init', onInit); s.off('onlineUsers', onUsers); };
+    s.on('leaderboard_update', onLeaderboard);
+    s.emit('get_leaderboard');
+    return () => { s.off('init', onInit); s.off('onlineUsers', onUsers); s.off('leaderboard_update', onLeaderboard); };
   }, []);
 
   const openGame = (game) => {
@@ -134,6 +138,34 @@ export default function V2GamesScreen({ navigation }) {
               </PressableScale>
             ))}
           </View>
+
+          {leaderboard.length > 0 && (
+            <View style={s.leaderCard}>
+              <View style={s.leaderHeader}>
+                <Ionicons name="trophy" size={18} color={C.gold} />
+                <Text style={s.leaderTitle}>أفضل اللاعبين</Text>
+              </View>
+
+              {leaderboard.map((entry, index) => {
+                const rank = index + 1;
+                const rankColor = rank === 1 ? C.gold : rank === 2 ? '#94A3B8' : rank === 3 ? '#D97706' : C.elevated || '#1E2A3D';
+                return (
+                  <View key={entry.name + index} style={[s.leaderRow, index < leaderboard.length - 1 && s.leaderRowBorder]}>
+                    <Text style={s.leaderPoints}>{entry.points.toLocaleString('ar')}</Text>
+                    <View style={s.leaderNameRow}>
+                      <View style={[s.rankBadge, { backgroundColor: rankColor }]}>
+                        <Text style={s.rankBadgeTxt}>{rank}</Text>
+                      </View>
+                      <View style={s.leaderAvatar}>
+                        <Text style={s.leaderAvatarTxt}>{entry.name.charAt(0)}</Text>
+                      </View>
+                      <Text style={s.leaderName}>{entry.name}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
@@ -170,4 +202,16 @@ const s = StyleSheet.create({
   gamePlayers: { color: C.sub, fontSize: 12, fontWeight: '600', marginRight: 4 },
   soonBadge: { backgroundColor: C.elevated || '#1E2A3D', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   soonTxt: { color: C.muted, fontSize: 11, fontWeight: '700' },
+  leaderCard: { backgroundColor: C.surface, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginTop: 6 },
+  leaderHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 14 },
+  leaderTitle: { color: C.text, fontSize: 15, fontWeight: '800', marginRight: 8 },
+  leaderRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+  leaderRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
+  leaderNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  rankBadge: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  rankBadgeTxt: { color: '#0B1120', fontSize: 12, fontWeight: '800' },
+  leaderAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.elevated || '#1E2A3D', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  leaderAvatarTxt: { color: C.text, fontSize: 14, fontWeight: '800' },
+  leaderName: { color: C.text, fontSize: 14, fontWeight: '700', marginRight: 4 },
+  leaderPoints: { color: C.gold, fontSize: 15, fontWeight: '800' },
 });

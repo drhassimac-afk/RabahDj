@@ -50,6 +50,7 @@ export default function V2XOGameScreen({ navigation }) {
   const sock = useRef(getSocket());
   const [state, setState] = useState({ board: Array(9).fill(null), turn: 'X', winner: null, players: {} });
   const fade = useRef(new Animated.Value(0)).current;
+  const scoreSubmitted = useRef(false);
 
   useEffect(() => {
     Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -62,6 +63,14 @@ export default function V2XOGameScreen({ navigation }) {
 
   const mySymbol = state.players.X === sock.current.id ? 'X' : state.players.O === sock.current.id ? 'O' : null;
   const myTurn = mySymbol && mySymbol === state.turn && !state.winner;
+
+  useEffect(() => {
+    if (!state.winner) { scoreSubmitted.current = false; return; }
+    if (state.winner === mySymbol && !scoreSubmitted.current) {
+      scoreSubmitted.current = true;
+      sock.current.emit('game_score_submit', { points: 50, game: 'xo' });
+    }
+  }, [state.winner]);
 
   const press = (i) => {
     if (state.board[i] || state.winner) return;
