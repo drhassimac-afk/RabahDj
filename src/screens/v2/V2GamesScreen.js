@@ -1,86 +1,85 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSocket } from '../../api/socket';
 
 const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', gold:'#FACC15', danger:'#EF4444', success:'#22C55E' };
 
+const GAMES = [
+  {
+    id: 'xo',
+    title: 'إكس أو',
+    subtitle: 'اللعبة الكلاسيكية للاعبين',
+    icon: 'radio-button-on',
+    color: '#3B82F6',
+    rating: 4.5,
+    route: 'XOGame',
+    available: true,
+  },
+  {
+    id: 'memory',
+    title: 'ذاكرة',
+    subtitle: 'اختبر ذاكرتك',
+    icon: 'sparkles',
+    color: '#A855F7',
+    rating: 4.2,
+    available: false,
+  },
+  {
+    id: 'cards',
+    title: 'ورق',
+    subtitle: 'ألعاب الورق',
+    icon: 'albums',
+    color: '#EF4444',
+    rating: 4.3,
+    available: false,
+  },
+  {
+    id: 'quiz',
+    title: 'مسابقة',
+    subtitle: 'أسئلة عامة',
+    icon: 'help-circle',
+    color: '#22C55E',
+    rating: 4.7,
+    available: false,
+  },
+];
+
 function PressableScale({ style, onPress, disabled, children }) {
   const scale = useRef(new Animated.Value(1)).current;
-  const onIn = () => !disabled && Animated.spring(scale, { toValue: 0.95, useNativeDriver: true, speed: 60 }).start();
+  const onIn = () => !disabled && Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 60 }).start();
   const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start();
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
-      <TouchableOpacity style={style} onPress={onPress} disabled={disabled} activeOpacity={0.75} onPressIn={onIn} onPressOut={onOut}>
+      <TouchableOpacity style={style} onPress={onPress} disabled={disabled} activeOpacity={0.8} onPressIn={onIn} onPressOut={onOut}>
         {children}
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
-function Cell({ value, onPress, disabled }) {
-  const scale = useRef(new Animated.Value(value ? 1 : 0)).current;
-  const prevValue = useRef(value);
-
-  useEffect(() => {
-    if (value && !prevValue.current) {
-      scale.setValue(0);
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 14 }).start();
-    }
-    if (!value) scale.setValue(0);
-    prevValue.current = value;
-  }, [value]);
-
-  return (
-    <TouchableOpacity style={s.cell} onPress={onPress} activeOpacity={0.7} disabled={disabled || !!value}>
-      <Animated.Text style={[
-        s.cellTxt,
-        { transform: [{ scale }] },
-        value === 'X' && { color: C.primary },
-        value === 'O' && { color: C.danger },
-      ]}>
-        {value || ''}
-      </Animated.Text>
-    </TouchableOpacity>
-  );
-}
-
 export default function V2GamesScreen({ navigation }) {
   const sock = useRef(getSocket());
-  const [state, setState] = useState({ board: Array(9).fill(null), turn: 'X', winner: null, players: {} });
+  const [onlineCount, setOnlineCount] = useState(0);
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     const s = sock.current;
-    const onState = (st) => setState(st);
-    s.on('xo_state', onState);
-    s.emit('xo_join');
-    return () => s.off('xo_state', onState);
+    const onInit = (d) => setOnlineCount((d.onlineUsers || []).length);
+    const onUsers = (list) => setOnlineCount((list || []).length);
+    s.on('init', onInit);
+    s.on('onlineUsers', onUsers);
+    return () => { s.off('init', onInit); s.off('onlineUsers', onUsers); };
   }, []);
 
-  const mySymbol = state.players.X === sock.current.id ? 'X' : state.players.O === sock.current.id ? 'O' : null;
-  const myTurn = mySymbol && mySymbol === state.turn && !state.winner;
-
-  const press = (i) => {
-    if (state.board[i] || state.winner) return;
-    if (mySymbol !== state.turn) return;
-    sock.current.emit('xo_move', { index: i });
+  const openGame = (game) => {
+    if (!game.available) return;
+    navigation.navigate(game.route);
   };
 
-  const reset = () => sock.current.emit('xo_reset');
-
-  let statusText = '';
-  let statusColor = C.text;
-  if (state.winner === 'draw') { statusText = 'تعادل! 🤝'; statusColor = C.gold; }
-  else if (state.winner) {
-    const iWon = state.winner === mySymbol;
-    statusText = iWon ? 'فزت! 🎉' : `فاز ${state.winner} 🎉`;
-    statusColor = iWon ? C.success : C.danger;
-  }
-  else if (!mySymbol) statusText = 'الغرفة ممتلئة — شاهد فقط';
-  else statusText = myTurn ? 'دورك أنت' : 'دور الطرف الآخر';
+  const availableCount = GAMES.filter((g) => g.available).length;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -88,30 +87,54 @@ export default function V2GamesScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-forward" size={24} color={C.sub} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>إكس أو</Text>
-        <TouchableOpacity onPress={reset} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="refresh" size={22} color={C.gold} />
-        </TouchableOpacity>
+        <Text style={s.headerTitle}>ألعاب</Text>
+        <View style={s.headerBadge}>
+          <Ionicons name="game-controller" size={20} color="#fff" />
+        </View>
       </View>
 
-      <Animated.View style={[s.body, { opacity: fade }]}>
-        {mySymbol && (
-          <View style={[s.symbolChip, { borderColor: mySymbol === 'X' ? C.primary : C.danger }]}>
-            <Text style={[s.symbolChipTxt, { color: mySymbol === 'X' ? C.primary : C.danger }]}>أنت: {mySymbol}</Text>
+      <ScrollView contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ opacity: fade }}>
+          <View style={s.statsRow}>
+            <View style={s.statCard}>
+              <Ionicons name="trophy" size={26} color={C.gold} />
+              <Text style={s.statValue}>{availableCount}</Text>
+              <Text style={s.statLabel}>لعبة متاحة</Text>
+            </View>
+            <View style={s.statCard}>
+              <Ionicons name="people" size={26} color={C.primary} />
+              <Text style={s.statValue}>{onlineCount}</Text>
+              <Text style={s.statLabel}>لاعب متصل الآن</Text>
+            </View>
           </View>
-        )}
-        <Text style={[s.status, { color: statusColor }]}>{statusText}</Text>
 
-        <View style={[s.board, myTurn && s.boardActive]}>
-          {state.board.map((cell, i) => (
-            <Cell key={i} value={cell} onPress={() => press(i)} disabled={!myTurn} />
-          ))}
-        </View>
+          <Text style={s.sectionTitle}>الألعاب المتاحة</Text>
 
-        <PressableScale style={s.resetBtn} onPress={reset}>
-          <Text style={s.resetTxt}>لعبة جديدة</Text>
-        </PressableScale>
-      </Animated.View>
+          <View style={s.grid}>
+            {GAMES.map((game) => (
+              <PressableScale key={game.id} style={s.gameCard} onPress={() => openGame(game)} disabled={!game.available}>
+                <View style={[s.gameIcon, { backgroundColor: game.color }, !game.available && { opacity: 0.5 }]}>
+                  <Ionicons name={game.icon} size={30} color="#fff" />
+                </View>
+                <Text style={[s.gameTitle, !game.available && { color: C.muted }]}>{game.title}</Text>
+                <Text style={s.gameSub} numberOfLines={1}>{game.subtitle}</Text>
+                {game.available ? (
+                  <View style={s.gameFooter}>
+                    <Ionicons name="star" size={12} color={C.gold} />
+                    <Text style={s.gameRating}>{game.rating}</Text>
+                    <Ionicons name="people" size={12} color={C.sub} style={{ marginRight: 8 }} />
+                    <Text style={s.gamePlayers}>{onlineCount}</Text>
+                  </View>
+                ) : (
+                  <View style={s.soonBadge}>
+                    <Text style={s.soonTxt}>قريبًا</Text>
+                  </View>
+                )}
+              </PressableScale>
+            ))}
+          </View>
+        </Animated.View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -122,23 +145,28 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  headerTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  symbolChip: {
-    borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 10,
+  headerTitle: { color: C.text, fontSize: 20, fontWeight: '800' },
+  headerBadge: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#B45309', alignItems: 'center', justifyContent: 'center' },
+  body: { padding: 16, paddingBottom: 40 },
+  statsRow: { flexDirection: 'row-reverse', gap: 12, marginBottom: 24 },
+  statCard: {
+    flex: 1, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', paddingVertical: 20, gap: 8,
   },
-  symbolChipTxt: { fontSize: 13, fontWeight: '800' },
-  status: { fontSize: 18, fontWeight: '700', marginBottom: 24 },
-  board: {
-    width: 270, height: 270, flexDirection: 'row', flexWrap: 'wrap',
-    borderRadius: 12, overflow: 'hidden', opacity: 0.85,
+  statValue: { color: C.text, fontSize: 24, fontWeight: '800' },
+  statLabel: { color: C.sub, fontSize: 12, fontWeight: '600' },
+  sectionTitle: { color: C.text, fontSize: 15, fontWeight: '800', textAlign: 'right', marginBottom: 14 },
+  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gameCard: {
+    width: '48%', backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', paddingVertical: 18, paddingHorizontal: 10, marginBottom: 14,
   },
-  boardActive: { opacity: 1 },
-  cell: {
-    width: 90, height: 90, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cellTxt: { fontSize: 42, fontWeight: '900', color: C.text },
-  resetBtn: { marginTop: 28, backgroundColor: C.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 },
-  resetTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  gameIcon: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  gameTitle: { color: C.text, fontSize: 15, fontWeight: '800', marginBottom: 4 },
+  gameSub: { color: C.sub, fontSize: 11, textAlign: 'center', marginBottom: 10 },
+  gameFooter: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  gameRating: { color: C.gold, fontSize: 12, fontWeight: '700', marginRight: 4 },
+  gamePlayers: { color: C.sub, fontSize: 12, fontWeight: '600', marginRight: 4 },
+  soonBadge: { backgroundColor: C.elevated || '#1E2A3D', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  soonTxt: { color: C.muted, fontSize: 11, fontWeight: '700' },
 });
