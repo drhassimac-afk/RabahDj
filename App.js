@@ -38,6 +38,8 @@ import V2CinemaScreen from './src/screens/v2/V2CinemaScreen';
 import V2GamesScreen from './src/screens/v2/V2GamesScreen';
 import V2XOGameScreen from './src/screens/v2/V2XOGameScreen';
 import V2MemoryGameScreen from './src/screens/v2/V2MemoryGameScreen';
+import V2CardsGameScreen from './src/screens/v2/V2CardsGameScreen';
+import V2QuizGameScreen from './src/screens/v2/V2QuizGameScreen';
 import FileShareScreen from './src/screens/v2/FileShareScreen';
 import V2NotificationsScreen from './src/screens/v2/V2NotificationsScreen';
 import V2NearbyScreen from './src/screens/v2/V2NearbyScreen';
@@ -205,6 +207,16 @@ export default function App() {
           <Stack.Screen
             name="MemoryGame"
             component={V2MemoryGameScreen}
+          />
+
+          <Stack.Screen
+            name="CardsGame"
+            component={V2CardsGameScreen}
+          />
+
+          <Stack.Screen
+            name="QuizGame"
+            component={V2QuizGameScreen}
           />
 
           <Stack.Screen

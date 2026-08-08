@@ -1,51 +1,65 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSocket } from '../../api/socket';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const GRID_GAP = 12;
+const GAME_CARD_WIDTH = (SCREEN_W - 16 * 2 - GRID_GAP) / 2;
 
 const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', gold:'#FACC15', danger:'#EF4444', success:'#22C55E' };
 
 const GAMES = [
   {
-    id: 'xo',
-    title: 'إكس أو',
-    subtitle: 'اللعبة الكلاسيكية للاعبين',
-    icon: 'radio-button-on',
-    color: '#3B82F6',
-    rating: 4.5,
-    route: 'XOGame',
-    available: true,
-  },
-  {
     id: 'memory',
     title: 'ذاكرة',
     subtitle: 'اختبر ذاكرتك',
-    icon: 'sparkles',
+    emoji: '🧠',
     color: '#A855F7',
     rating: 4.2,
     route: 'MemoryGame',
     available: true,
   },
   {
+    id: 'xo',
+    title: 'إكس أو',
+    subtitle: 'اللعبة الكلاسيكية للاعبين',
+    emoji: '⭕',
+    color: '#3B82F6',
+    rating: 4.5,
+    route: 'XOGame',
+    available: true,
+  },
+  {
     id: 'cards',
     title: 'ورق',
-    subtitle: 'ألعاب الورق',
-    icon: 'albums',
+    subtitle: 'أعلى ولا أقل',
+    emoji: '🃏',
     color: '#EF4444',
     rating: 4.3,
-    available: false,
+    route: 'CardsGame',
+    available: true,
   },
   {
     id: 'quiz',
     title: 'مسابقة',
     subtitle: 'أسئلة عامة',
-    icon: 'help-circle',
+    emoji: '❓',
     color: '#22C55E',
     rating: 4.7,
-    available: false,
+    route: 'QuizGame',
+    available: true,
   },
 ];
+
+function chunkPairs(arr) {
+  const rows = [];
+  for (let i = 0; i < arr.length; i += 2) {
+    rows.push(arr.slice(i, i + 2));
+  }
+  return rows;
+}
 
 function PressableScale({ style, onPress, disabled, children }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -98,7 +112,7 @@ export default function V2GamesScreen({ navigation }) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
         <Animated.View style={{ opacity: fade }}>
           <View style={s.statsRow}>
             <View style={s.statCard}>
@@ -116,26 +130,36 @@ export default function V2GamesScreen({ navigation }) {
           <Text style={s.sectionTitle}>الألعاب المتاحة</Text>
 
           <View style={s.grid}>
-            {GAMES.map((game) => (
-              <PressableScale key={game.id} style={s.gameCard} onPress={() => openGame(game)} disabled={!game.available}>
-                <View style={[s.gameIcon, { backgroundColor: game.color }, !game.available && { opacity: 0.5 }]}>
-                  <Ionicons name={game.icon} size={30} color="#fff" />
-                </View>
-                <Text style={[s.gameTitle, !game.available && { color: C.muted }]}>{game.title}</Text>
-                <Text style={s.gameSub} numberOfLines={1}>{game.subtitle}</Text>
-                {game.available ? (
-                  <View style={s.gameFooter}>
-                    <Ionicons name="star" size={12} color={C.gold} />
-                    <Text style={s.gameRating}>{game.rating}</Text>
-                    <Ionicons name="people" size={12} color={C.sub} style={{ marginRight: 8 }} />
-                    <Text style={s.gamePlayers}>{onlineCount}</Text>
-                  </View>
-                ) : (
-                  <View style={s.soonBadge}>
-                    <Text style={s.soonTxt}>قريبًا</Text>
-                  </View>
-                )}
-              </PressableScale>
+            {chunkPairs(GAMES).map((row, rowIndex) => (
+              <View key={rowIndex} style={s.gridRow}>
+                {row.map((game) => (
+                  <PressableScale
+                    key={game.id}
+                    style={[s.gameCard, { width: GAME_CARD_WIDTH }]}
+                    onPress={() => openGame(game)}
+                    disabled={!game.available}
+                  >
+                    <View style={[s.gameIcon, { backgroundColor: game.color }, !game.available && { opacity: 0.5 }]}>
+                      <Text style={s.gameEmoji}>{game.emoji}</Text>
+                    </View>
+                    <Text style={[s.gameTitle, !game.available && { color: C.muted }]} numberOfLines={1}>{game.title}</Text>
+                    <Text style={s.gameSub} numberOfLines={1}>{game.subtitle}</Text>
+                    {game.available ? (
+                      <View style={s.gameFooter}>
+                        <Ionicons name="star" size={12} color={C.gold} />
+                        <Text style={s.gameRating}>{game.rating}</Text>
+                        <Ionicons name="people" size={12} color={C.sub} style={{ marginRight: 8 }} />
+                        <Text style={s.gamePlayers}>{onlineCount}</Text>
+                      </View>
+                    ) : (
+                      <View style={s.soonBadge}>
+                        <Text style={s.soonTxt}>قريبًا</Text>
+                      </View>
+                    )}
+                  </PressableScale>
+                ))}
+                {row.length === 1 && <View style={{ width: GAME_CARD_WIDTH }} />}
+              </View>
             ))}
           </View>
 
@@ -189,12 +213,17 @@ const s = StyleSheet.create({
   statValue: { color: C.text, fontSize: 24, fontWeight: '800' },
   statLabel: { color: C.sub, fontSize: 12, fontWeight: '600' },
   sectionTitle: { color: C.text, fontSize: 15, fontWeight: '800', textAlign: 'right', marginBottom: 14 },
-  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between' },
+  grid: {},
+  gridRow: { flexDirection: 'row-reverse', justifyContent: 'space-between' },
   gameCard: {
-    width: '48%', backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border,
+    backgroundColor: C.surface, borderRadius: 18, borderWidth: 1, borderColor: C.border,
     alignItems: 'center', paddingVertical: 18, paddingHorizontal: 10, marginBottom: 14,
   },
-  gameIcon: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  gameIcon: {
+    width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4,
+  },
+  gameEmoji: { fontSize: 32 },
   gameTitle: { color: C.text, fontSize: 15, fontWeight: '800', marginBottom: 4 },
   gameSub: { color: C.sub, fontSize: 11, textAlign: 'center', marginBottom: 10 },
   gameFooter: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
