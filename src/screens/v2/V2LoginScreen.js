@@ -7,8 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getSocket } from '../../api/socket';
-import { SERVER_URL } from '../../api/config';
+import { getSocket, resetSocket } from '../../api/socket';
+import { SERVER_URL, setManualServerIp } from '../../api/config';
 import { setCurrentUser } from '../../api/currentUser';
 
 const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', success:'#22C55E', danger:'#EF4444', gold:'#FACC15', live:'#A855F7', elevated:'#1E2A3D' };
@@ -45,6 +45,11 @@ export default function V2LoginScreen({ navigation }) {
   const [focused, setFocused] = useState(false);
   const [avatarColor, setAvatarColor] = useState(AVATAR_COLORS[0]);
   const [lastName, setLastName] = useState(null);
+  const [showManualIp, setShowManualIp] = useState(false);
+  const [manualIp, setManualIp] = useState('');
+  const [manualBusy, setManualBusy] = useState(false);
+  const [manualMsg, setManualMsg] = useState('');
+  const [currentServer, setCurrentServer] = useState(SERVER_URL);
   const sock = useRef(getSocket());
 
   const fade = useRef(new Animated.Value(0)).current;
@@ -125,6 +130,25 @@ export default function V2LoginScreen({ navigation }) {
   const retry = () => {
     setStatus('idle');
     setMsg('');
+  };
+
+  const applyManualIp = async () => {
+    if (!manualIp.trim()) return;
+    setManualBusy(true);
+    setManualMsg('');
+    const res = await setManualServerIp(manualIp.trim());
+    setManualBusy(false);
+    if (res.ok) {
+      resetSocket();
+      sock.current = getSocket();
+      setCurrentServer(SERVER_URL);
+      setShowManualIp(false);
+      setManualMsg('');
+      setStatus('idle');
+      setMsg('');
+    } else {
+      setManualMsg('تعذّر الوصول لهذا العنوان');
+    }
   };
 
   if (status === 'connected') {
@@ -242,9 +266,34 @@ export default function V2LoginScreen({ navigation }) {
                   : <Text style={s.btnTxt}>دخول</Text>}
               </PressableScale>
             )}
+
+            {status === 'error' && !showManualIp && (
+              <TouchableOpacity style={s.manualLink} onPress={() => setShowManualIp(true)}>
+                <Text style={s.manualLinkTxt}>تغيير عنوان السيرفر يدويًا</Text>
+              </TouchableOpacity>
+            )}
+
+            {showManualIp && (
+              <View style={s.manualBox}>
+                <Text style={s.manualLabel}>عنوان IP السيرفر (زي اللي طالع بشاشة Termux)</Text>
+                <TextInput
+                  style={s.manualInput}
+                  placeholder="192.168.1.5"
+                  placeholderTextColor={C.muted}
+                  value={manualIp}
+                  onChangeText={setManualIp}
+                  keyboardType="numbers-and-punctuation"
+                  autoCapitalize="none"
+                />
+                {!!manualMsg && <Text style={s.manualErr}>{manualMsg}</Text>}
+                <PressableScale style={[s.btn, { backgroundColor: C.primary, marginTop: 4 }]} onPress={applyManualIp} disabled={manualBusy}>
+                  {manualBusy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>اتصال</Text>}
+                </PressableScale>
+              </View>
+            )}
           </Animated.View>
 
-          <Text style={s.note2}>السيرفر: {SERVER_URL.replace('http://', '')}</Text>
+          <Text style={s.note2}>السيرفر: {currentServer.replace('http://', '')}</Text>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -278,6 +327,12 @@ const s = StyleSheet.create({
   btn:{marginTop:20,backgroundColor:C.primary,borderRadius:28,height:54,alignItems:'center',justifyContent:'center',flexDirection:'row'},
   btnTxt:{color:'#fff',fontSize:16,fontWeight:'700'},
   note2:{color:C.muted,fontSize:11,textAlign:'center',marginTop:'auto',marginBottom:16},
+  manualLink:{alignItems:'center',marginTop:16},
+  manualLinkTxt:{color:C.primary,fontSize:13,fontWeight:'700'},
+  manualBox:{marginTop:14,backgroundColor:C.surface,borderRadius:16,borderWidth:1,borderColor:C.border,padding:16},
+  manualLabel:{color:C.sub,fontSize:12,marginBottom:8,textAlign:'right'},
+  manualInput:{backgroundColor:C.elevated,borderWidth:1,borderColor:C.border,borderRadius:12,color:C.text,fontSize:15,paddingHorizontal:14,paddingVertical:10,textAlign:'right'},
+  manualErr:{color:C.danger,fontSize:12,marginTop:8,textAlign:'right'},
   center:{flex:1,alignItems:'center',justifyContent:'center'},
   okIcon:{marginBottom:18},
 });

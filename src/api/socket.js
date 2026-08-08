@@ -8,7 +8,7 @@ let adminToken = null;
 export function getSocket() {
   if (!socket) {
     socket = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionDelay: 1500,
     });
@@ -20,6 +20,18 @@ export function getSocket() {
     socket.on('viewer-joined', () => addNotification('live', 'انضم مشاهد جديد للبث المباشر'));
   }
   return socket;
+}
+
+export function resetSocket() {
+  if (socket) {
+    try {
+      socket.removeAllListeners();
+      socket.disconnect();
+    } catch (err) {
+      // تجاهل
+    }
+  }
+  socket = null;
 }
 
 export const setAdminToken = (t) => { adminToken = t; };
