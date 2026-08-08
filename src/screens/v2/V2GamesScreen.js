@@ -24,7 +24,8 @@ const GAMES = [
     icon: 'sparkles',
     color: '#A855F7',
     rating: 4.2,
-    available: false,
+    route: 'MemoryGame',
+    available: true,
   },
   {
     id: 'cards',

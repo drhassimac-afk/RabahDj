@@ -37,6 +37,7 @@ import V2LiveStreamScreen from './src/screens/v2/V2LiveStreamScreen';
 import V2CinemaScreen from './src/screens/v2/V2CinemaScreen';
 import V2GamesScreen from './src/screens/v2/V2GamesScreen';
 import V2XOGameScreen from './src/screens/v2/V2XOGameScreen';
+import V2MemoryGameScreen from './src/screens/v2/V2MemoryGameScreen';
 import FileShareScreen from './src/screens/v2/FileShareScreen';
 import V2NotificationsScreen from './src/screens/v2/V2NotificationsScreen';
 import V2NearbyScreen from './src/screens/v2/V2NearbyScreen';
@@ -199,6 +200,11 @@ export default function App() {
           <Stack.Screen
             name="XOGame"
             component={V2XOGameScreen}
+          />
+
+          <Stack.Screen
+            name="MemoryGame"
+            component={V2MemoryGameScreen}
           />
 
           <Stack.Screen
