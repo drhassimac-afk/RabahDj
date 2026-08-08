@@ -5,11 +5,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket } from '../../api/socket';
 import { SERVER_URL } from '../../api/config';
 import { setCurrentUser } from '../../api/currentUser';
 
 const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', success:'#22C55E', danger:'#EF4444', gold:'#FACC15', live:'#A855F7', elevated:'#1E2A3D' };
+
+const AVATAR_COLORS = ['#3B82F6', '#22C55E', '#A855F7', '#F59E0B', '#F43F5E', '#14B8A6', '#EC4899', '#FACC15'];
+const LAST_NAME_KEY = 'rabahdj_last_name';
+const LAST_COLOR_KEY = 'rabahdj_last_color';
 
 function PressableScale({ style, onPress, disabled, children, activeOpacity = 0.85 }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -37,18 +43,38 @@ export default function V2LoginScreen({ navigation }) {
   const [msg, setMsg] = useState('');
   const [initData, setInitData] = useState({});
   const [focused, setFocused] = useState(false);
+  const [avatarColor, setAvatarColor] = useState(AVATAR_COLORS[0]);
+  const [lastName, setLastName] = useState(null);
   const sock = useRef(getSocket());
 
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(16)).current;
   const shake = useRef(new Animated.Value(0)).current;
+  const glow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fade, { toValue: 1, duration: 420, useNativeDriver: true }),
       Animated.spring(slide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 6 }),
     ]).start();
+
+    Animated.loop(Animated.sequence([
+      Animated.timing(glow, { toValue: 1, duration: 1800, useNativeDriver: true }),
+      Animated.timing(glow, { toValue: 0, duration: 1800, useNativeDriver: true }),
+    ])).start();
+
+    (async () => {
+      try {
+        const savedName = await AsyncStorage.getItem(LAST_NAME_KEY);
+        const savedColor = await AsyncStorage.getItem(LAST_COLOR_KEY);
+        if (savedName) setLastName(savedName);
+        if (savedColor && AVATAR_COLORS.includes(savedColor)) setAvatarColor(savedColor);
+      } catch (err) { /* تجاهل */ }
+    })();
   }, []);
+
+  const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] });
 
   const runShake = () => {
     shake.setValue(0);
@@ -60,6 +86,24 @@ export default function V2LoginScreen({ navigation }) {
     ]).start();
   };
 
+  const doConnect = (n, color) => {
+    Keyboard.dismiss();
+    setCurrentUser(n);
+    setStatus('connecting'); setMsg('');
+    AsyncStorage.setItem(LAST_NAME_KEY, n).catch(() => {});
+    AsyncStorage.setItem(LAST_COLOR_KEY, color).catch(() => {});
+    const s = sock.current;
+    const onUsersList = (data) => { setStatus('connected'); setInitData(data || {}); s.off('init', onUsersList); s.off('error', onErr); };
+    const onErr = (e) => { setStatus('error'); setMsg((e && e.message) || 'فشل الاتصال'); s.off('init', onUsersList); s.off('error', onErr); };
+    s.off('init'); s.off('error');
+    s.on('init', onUsersList); s.on('error', onErr);
+    const doJoin = () => s.emit('join', { name: n, avatarColor: color });
+    if (!s.connected) {
+      s.once('connect', doJoin);
+      s.once('connect_error', () => { setStatus('error'); setMsg('تعذّر الوصول للسيرفر المحلي'); });
+    } else doJoin();
+  };
+
   const join = () => {
     const n = name.trim();
     if (!n) {
@@ -68,19 +112,14 @@ export default function V2LoginScreen({ navigation }) {
       runShake();
       return;
     }
-    Keyboard.dismiss();
-    setCurrentUser(n);
-    setStatus('connecting'); setMsg('');
-    const s = sock.current;
-    const onUsersList = (data) => { setStatus('connected'); setInitData(data || {}); s.off('init', onUsersList); s.off('error', onErr); };
-    const onErr = (e) => { setStatus('error'); setMsg((e && e.message) || 'فشل الاتصال'); s.off('init', onUsersList); s.off('error', onErr); };
-    s.off('init'); s.off('error');
-    s.on('init', onUsersList); s.on('error', onErr);
-    const doJoin = () => s.emit('join', { name: n, avatarColor: C.primary });
-    if (!s.connected) {
-      s.once('connect', doJoin);
-      s.once('connect_error', () => { setStatus('error'); setMsg('تعذّر الوصول للسيرفر المحلي'); });
-    } else doJoin();
+    doConnect(n, avatarColor);
+  };
+
+  const quickJoin = () => {
+    if (!lastName) return;
+    setName(lastName);
+    Vibration.vibrate(15);
+    doConnect(lastName, avatarColor);
   };
 
   const retry = () => {
@@ -113,82 +152,126 @@ export default function V2LoginScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={s.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <TouchableOpacity style={s.back} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-forward" size={24} color={C.sub} />
-        </TouchableOpacity>
+    <View style={{ flex:1 }}>
+      <LinearGradient
+        colors={['#0B1120', '#131C30', avatarColor + '22', '#0B1120']}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={s.safe}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity style={s.back} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-forward" size={24} color={C.sub} />
+          </TouchableOpacity>
 
-        <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
-          <View style={s.top}>
-            <View style={s.logo}><Ionicons name="person-circle" size={52} color={C.primary} /></View>
-            <Text style={s.title}>انضم للشبكة</Text>
-            <Text style={s.sub}>أدخل اسمك للاتصال بالسيرفر المحلي</Text>
-          </View>
+          <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
+            <View style={s.top}>
+              <View style={s.logoWrap}>
+                <Animated.View style={[s.logoGlow, { backgroundColor: avatarColor, transform: [{ scale: glowScale }], opacity: glowOpacity }]} />
+                <View style={[s.logo, { borderColor: avatarColor }]}>
+                  <Ionicons name="person-circle" size={52} color={avatarColor} />
+                </View>
+              </View>
+              <Text style={s.title}>انضم للشبكة</Text>
+              <Text style={s.sub}>أدخل اسمك للاتصال بالسيرفر المحلي</Text>
+            </View>
 
-          <Animated.View style={[
-            s.field,
-            focused && s.fieldFocused,
-            status === 'error' && s.fieldError,
-            { transform: [{ translateX: shake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] }) }] },
-          ]}>
-            <TextInput
-              style={s.input}
-              placeholder="اسمك"
-              placeholderTextColor={C.muted}
-              value={name}
-              onChangeText={(t) => { setName(t); if (msg) setMsg(''); }}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              autoCapitalize="none"
-              returnKeyType="done"
-              onSubmitEditing={join}
-            />
+            {!!lastName && status === 'idle' && (
+              <PressableScale style={s.quickBtn} onPress={quickJoin}>
+                <View style={[s.quickAvatar, { backgroundColor: avatarColor }]}>
+                  <Text style={s.quickAvatarTxt}>{lastName.trim().charAt(0)}</Text>
+                </View>
+                <Text style={s.quickTxt}>دخول سريع باسم {lastName}</Text>
+                <Ionicons name="flash" size={18} color={C.gold} />
+              </PressableScale>
+            )}
+
+            <Animated.View style={[
+              s.field,
+              focused && s.fieldFocused,
+              status === 'error' && s.fieldError,
+              { transform: [{ translateX: shake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] }) }] },
+            ]}>
+              <TextInput
+                style={s.input}
+                placeholder="اسمك"
+                placeholderTextColor={C.muted}
+                value={name}
+                onChangeText={(t) => { setName(t); if (msg) setMsg(''); }}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={join}
+              />
+            </Animated.View>
+
+            <Text style={s.pickerLabel}>لون شخصيتك</Text>
+            <View style={s.colorRow}>
+              {AVATAR_COLORS.map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  onPress={() => { setAvatarColor(c); Vibration.vibrate(10); }}
+                  style={[s.colorDot, { backgroundColor: c }, avatarColor === c && s.colorDotActive]}
+                >
+                  {avatarColor === c && <Ionicons name="checkmark" size={16} color="#fff" />}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {status === 'error' ? (
+              <View style={s.errorBox}>
+                <Ionicons name="alert-circle" size={16} color={C.danger} />
+                <Text style={s.errTxt}>{msg}</Text>
+              </View>
+            ) : (
+              !!msg && <Text style={s.err}>{msg}</Text>
+            )}
+
+            {status === 'error' ? (
+              <PressableScale style={[s.btn, { backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border }]} onPress={retry}>
+                <Ionicons name="refresh" size={18} color={C.text} style={{ marginLeft: 8 }} />
+                <Text style={s.btnTxt}>إعادة المحاولة</Text>
+              </PressableScale>
+            ) : (
+              <PressableScale style={[s.btn, { backgroundColor: avatarColor }]} onPress={join} disabled={status === 'connecting'}>
+                {status === 'connecting'
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={s.btnTxt}>دخول</Text>}
+              </PressableScale>
+            )}
           </Animated.View>
 
-          {status === 'error' ? (
-            <View style={s.errorBox}>
-              <Ionicons name="alert-circle" size={16} color={C.danger} />
-              <Text style={s.errTxt}>{msg}</Text>
-            </View>
-          ) : (
-            !!msg && <Text style={s.err}>{msg}</Text>
-          )}
-
-          {status === 'error' ? (
-            <PressableScale style={[s.btn, { backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border }]} onPress={retry}>
-              <Ionicons name="refresh" size={18} color={C.text} style={{ marginLeft: 8 }} />
-              <Text style={s.btnTxt}>إعادة المحاولة</Text>
-            </PressableScale>
-          ) : (
-            <PressableScale style={s.btn} onPress={join} disabled={status === 'connecting'}>
-              {status === 'connecting'
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.btnTxt}>دخول</Text>}
-            </PressableScale>
-          )}
-        </Animated.View>
-
-        <Text style={s.note2}>السيرفر: {SERVER_URL.replace('http://', '')}</Text>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <Text style={s.note2}>السيرفر: {SERVER_URL.replace('http://', '')}</Text>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  safe:{flex:1,backgroundColor:C.bg,paddingHorizontal:24},
+  safe:{flex:1,paddingHorizontal:24},
   back:{alignSelf:'flex-end',padding:8,marginTop:4},
-  top:{alignItems:'center',marginTop:30},
-  logo:{width:96,height:96,borderRadius:28,backgroundColor:C.surface,borderWidth:1,borderColor:C.border,alignItems:'center',justifyContent:'center',marginBottom:18},
+  top:{alignItems:'center',marginTop:20},
+  logoWrap:{width:96,height:96,alignItems:'center',justifyContent:'center',marginBottom:18},
+  logoGlow:{position:'absolute',width:96,height:96,borderRadius:28},
+  logo:{width:96,height:96,borderRadius:28,backgroundColor:C.surface,borderWidth:1.5,alignItems:'center',justifyContent:'center'},
   title:{color:C.text,fontSize:24,fontWeight:'800'},
   sub:{color:C.sub,fontSize:14,marginTop:6,textAlign:'center'},
-  field:{marginTop:36,backgroundColor:C.surface,borderRadius:16,borderWidth:1,borderColor:C.border},
+  quickBtn:{flexDirection:'row-reverse',alignItems:'center',backgroundColor:C.surface,borderRadius:16,borderWidth:1,borderColor:C.gold+'55',paddingVertical:12,paddingHorizontal:14,marginTop:24,gap:10},
+  quickAvatar:{width:32,height:32,borderRadius:16,alignItems:'center',justifyContent:'center'},
+  quickAvatarTxt:{color:'#fff',fontWeight:'700'},
+  quickTxt:{color:C.text,fontSize:13,fontWeight:'600',flex:1,marginHorizontal:8,textAlign:'right'},
+  field:{marginTop:20,backgroundColor:C.surface,borderRadius:16,borderWidth:1,borderColor:C.border},
   fieldFocused:{borderColor:C.primary},
   fieldError:{borderColor:C.danger},
   input:{color:C.text,fontSize:17,paddingHorizontal:18,paddingVertical:16,textAlign:'right'},
+  pickerLabel:{color:C.sub,fontSize:12,fontWeight:'700',marginTop:18,marginBottom:10,textAlign:'right'},
+  colorRow:{flexDirection:'row-reverse',flexWrap:'wrap',gap:12},
+  colorDot:{width:36,height:36,borderRadius:18,alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'transparent'},
+  colorDotActive:{borderColor:'#fff'},
   err:{color:C.danger,fontSize:13,textAlign:'center',marginTop:12},
   errorBox:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',marginTop:12,gap:6},
   errTxt:{color:C.danger,fontSize:13,marginRight:6},
