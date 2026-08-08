@@ -52,6 +52,20 @@ async function scanSubnet(prefix) {
  * 2) لو فشل، يمسح باقي الشبكة (نفس أول 3 أجزاء من IP الجهاز) لحد ما يلاقي السيرفر
  * 3) يحفظ الـ IP اللي نجح فيه عشان المرة الجاية
  */
+export async function setManualServerIp(ip) {
+  const clean = (ip || '').trim();
+  if (!clean) return { ok: false };
+  const ok = await pingHost(clean, 2000);
+  if (!ok) return { ok: false };
+  applyServerIp(clean);
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, clean);
+  } catch (err) {
+    // تجاهل
+  }
+  return { ok: true, ip: clean };
+}
+
 export async function discoverServer() {
   try {
     const cachedIp = await AsyncStorage.getItem(STORAGE_KEY);

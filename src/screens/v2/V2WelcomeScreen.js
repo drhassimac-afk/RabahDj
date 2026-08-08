@@ -148,7 +148,11 @@ export default function V2WelcomeScreen({ navigation }) {
           </View>
         </View>
 
-        <Text style={styles.title}>RabahDj</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Rabah</Text>
+          <Text style={[styles.title, { color: C.primary }]}>Dj</Text>
+        </View>
+        <View style={styles.titleUnderline} />
         <Text style={styles.subtitle}>شبكتك الاجتماعية المحلية</Text>
 
         <View style={styles.statusRow}>
@@ -242,8 +246,18 @@ const styles = StyleSheet.create({
     color: C.text,
     fontSize: 38,
     fontWeight: '900',
-    marginTop: S.lg,
     letterSpacing: 0.5,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    marginTop: S.lg,
+  },
+  titleUnderline: {
+    width: 60,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: C.primary,
+    marginTop: 8,
   },
   subtitle: {
     color: C.primary,
