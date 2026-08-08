@@ -19,7 +19,6 @@
       "bitcode": false
     },
     "android": {
-      "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
