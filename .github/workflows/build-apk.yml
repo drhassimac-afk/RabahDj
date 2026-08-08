@@ -34,12 +34,6 @@ jobs:
       - name: 🏗️ Generate Android Folder (Clean Build)
         run: npx expo prebuild --platform android --clean
 
-      # 🟢 تعديل اسم الملف هنا إلى App.js لحل مشكلة توقف الأداة
-      - name: 📦 Bundle Assets & Latest JS Code
-        run: |
-          mkdir -p android/app/src/main/assets
-          npx expo export:embed --platform android --dev false --entry-file App.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
-
       - name: 🔑 Sign release build with debug key
         run: |
           cat >> android/app/build.gradle << 'EOF'
