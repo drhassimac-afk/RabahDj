@@ -409,12 +409,6 @@ export default function V2CinemaScreen({ navigation }) {
         </ScrollView>
 
         <View style={styles.infoRow}>
-          <Text style={styles.countText}>
-            المتاح على شبكتك (
-            {filteredItems.length}
-            )
-          </Text>
-
           {loading && (
             <ActivityIndicator
               size="small"
@@ -570,15 +564,16 @@ const styles = StyleSheet.create({
   categories: {
     flexDirection: 'row-reverse',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 6,
+    paddingBottom: 10,
   },
 
   categoryButton: {
     backgroundColor: C.surface,
-    borderRadius: 20,
-    paddingHorizontal: 17,
-    paddingVertical: 10,
-    marginLeft: 8,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginLeft: 6,
   },
 
   categoryButtonActive: {
@@ -587,7 +582,7 @@ const styles = StyleSheet.create({
 
   categoryText: {
     color: C.sub,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
 
@@ -598,10 +593,11 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: 20,
-    marginTop: 4,
-    marginBottom: 8,
+    marginTop: 0,
+    marginBottom: 4,
+    minHeight: 4,
   },
 
   countText: {

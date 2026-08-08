@@ -58,6 +58,9 @@ app.use('/media', express.static(mediaDir));
 // ✅ قائمة الأفلام المحلية المتاحة حالياً
 app.get('/media-list', (req, res) => {
     try {
+        if (!fs.existsSync(mediaDir)) {
+            fs.mkdirSync(mediaDir, { recursive: true });
+        }
         const validExt = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v'];
         const files = fs.readdirSync(mediaDir).filter((f) =>
             validExt.includes(path.extname(f).toLowerCase())
@@ -69,8 +72,10 @@ app.get('/media-list', (req, res) => {
         }));
         res.json({ movies });
     } catch (err) {
-        console.error('خطأ في قراءة مجلد الأفلام:', err);
-        res.status(500).json({ error: 'تعذر قراءة مجلد الأفلام' });
+        // ✅ إصلاح: لا نُرجع خطأ 500 لمجرد أن المجلد فارغ أو غير قابل للقراءة مؤقتًا —
+        // نرجّع قائمة فارغة بنجاح بدل ما يظهر خطأ مخيف للمستخدم بدون داعٍ
+        console.error('⚠️ خطأ في قراءة مجلد الأفلام (تم تجاهله وإرجاع قائمة فارغة):', err.message);
+        res.json({ movies: [] });
     }
 });
 
