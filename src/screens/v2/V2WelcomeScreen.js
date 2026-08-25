@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     marginTop: S.xl,
   },
   tile: {
-    width: '48%',
+    width: '31.5%',
     backgroundColor: C.surface,
     borderRadius: R.md,
     paddingVertical: S.md,
