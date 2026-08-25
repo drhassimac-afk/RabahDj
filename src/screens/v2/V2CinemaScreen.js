@@ -86,6 +86,7 @@ const CATEGORIES = [
   'كوميديا',
   'مسلسلات',
   'وثائقي',
+  'المفضلة',
 ];
 
 function getCategory(fileName) {
@@ -345,10 +346,14 @@ export default function V2CinemaScreen({ navigation }) {
       return allItems;
     }
 
+    if (category === 'المفضلة') {
+      return allItems.filter((item) => favorites.includes(item.id));
+    }
+
     return allItems.filter(
       (item) => item.category === category
     );
-  }, [allItems, category]);
+  }, [allItems, category, favorites]);
 
   return (
     <SafeAreaView style={styles.safe}>
