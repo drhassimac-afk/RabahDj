@@ -431,7 +431,7 @@ export default function V2CinemaScreen({ navigation }) {
         <FlatList
           data={filteredItems}
           keyExtractor={(item) => item.id}
-          numColumns={3}
+          numColumns={2}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.grid,
@@ -523,7 +523,7 @@ export default function V2CinemaScreen({ navigation }) {
   );
 }
 
-const CARD_WIDTH = (width - 48) / 3;
+const CARD_WIDTH = (width - 48) / 2;
 
 const styles = StyleSheet.create({
   safe: {
