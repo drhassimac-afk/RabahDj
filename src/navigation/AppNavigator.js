@@ -12,6 +12,7 @@ import EntertainmentScreen from '../screens/EntertainmentScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AdminScreen from '../screens/AdminScreen';
 import ChatScreen from '../screens/ChatScreen';
+import V2LiveStreamScreen from '../screens/v2/V2LiveStreamScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -99,6 +100,14 @@ export default function AppNavigator() {
             name="ChatScreen"
             component={ChatScreen}
             options={{ presentation: "card" }}
+          />
+          <Stack.Screen
+            name="LiveStream"
+            component={V2LiveStreamScreen}
+            options={{
+              presentation: "fullScreenModal",
+              headerShown: false,
+            }}
           />
         </>
       )}

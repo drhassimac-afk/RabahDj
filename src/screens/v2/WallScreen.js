@@ -44,8 +44,8 @@ export default function WallScreen({ route, navigation }) {
 
   const like = (id) => sock.current.emit('toggleLike', { postId: id });
   const del = (id) => { sock.current.emit('deletePost', { postId: id, token: adminToken }); Vibration.vibrate(20); flash('🗑️ تم الحذف'); };
-  const sendPost = () => { const t = draft.trim(); if (!t) return; sock.current.emit('newPost', { content: t }); setDraft(''); setPostModal(false); };
-  const sendCmt = () => { const t = cmt.trim(); if (!t || !cmtModal) return; sock.current.emit('newComment', { postId: cmtModal, content: t }); setCmt(''); setCmtModal(null); };
+  const sendPost = () => { const t = draft.trim(); if (!t) return; sock.current.emit('newPost', { text: t }); setDraft(''); setPostModal(false); };
+  const sendCmt = () => { const t = cmt.trim(); if (!t || !cmtModal) return; sock.current.emit('newComment', { postId: cmtModal, text: t }); setCmt(''); setCmtModal(null); };
 
   const Card = ({ item }) => {
     const comments = item.comments || [];

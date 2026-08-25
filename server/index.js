@@ -614,33 +614,6 @@ io.on('connection', (socket) => {
     });
 
     // === إضافة تعليق ===
-    socket.on('newComment', (data) => {
-        if (!isDbReady()) return;
-        try {
-            if (!data?.postId || !data?.text?.trim()) return;
-
-            const user = activeUsers.get(socket.id);
-            if (!user) return;
-
-            const postRef = db.get('posts').find({ id: data.postId });
-            const post = postRef.value();
-            if (!post) return;
-
-            const comments = [...(post.comments || [])];
-            comments.push({
-                id: Date.now().toString(),
-                authorName: user.name,
-                avatarColor: user.avatarColor, // ✅ إضافة لون الأفاتار للتعليق
-                text: data.text.trim(),
-                createdAt: new Date().toISOString(),
-            });
-
-            postRef.assign({ comments }).write();
-            io.emit('postUpdated', postRef.value());
-        } catch (err) {
-            console.error('خطأ في newComment:', err);
-        }
-    });
 
     // === حذف منشور (فقط صاحبه) ===
     socket.on('deletePost', (data) => {
@@ -861,6 +834,125 @@ io.on('connection', (socket) => {
     socket.on('webrtc-ice-candidate', (data) => {
         if (!data?.to) return;
         io.to(data.to).emit('webrtc-ice-candidate', { from: socket.id, candidate: data.candidate });
+    });
+
+
+    // ========================================
+    // ✅ نظام مكالمات الفيديو V2
+    // متوافق مع V2LiveStreamScreen.js
+    // ========================================
+
+    socket.on('join-video-room', (data) => {
+        const room = data?.room;
+        if (!room) return;
+
+        if (!global.videoRooms) {
+            global.videoRooms = {};
+        }
+
+        if (!global.videoRooms[room]) {
+            global.videoRooms[room] = {
+                hostId: null,
+                peerId: null,
+            };
+        }
+
+        const videoRoom = global.videoRooms[room];
+
+        // لا نسمح بأكثر من طرفين
+        if (videoRoom.hostId && videoRoom.peerId) {
+            socket.emit('video-room-full');
+            return;
+        }
+
+        socket.join(room);
+
+        let role;
+        let peerId = null;
+
+        if (!videoRoom.hostId) {
+            videoRoom.hostId = socket.id;
+            role = 'host';
+        } else {
+            videoRoom.peerId = socket.id;
+            role = 'peer';
+            peerId = videoRoom.hostId;
+
+            // إبلاغ المضيف بأن الطرف الثاني دخل
+            io.to(videoRoom.hostId).emit('video-peer-joined', {
+                peerId: socket.id,
+            });
+        }
+
+        socket.emit('video-room-joined', {
+            role,
+            peerId,
+        });
+
+        console.log(
+            `🎥 دخول غرفة الفيديو ${room}: ${socket.id} (${role})`
+        );
+    });
+
+    socket.on('leave-video-room', (data) => {
+        const room = data?.room;
+        if (!room || !global.videoRooms?.[room]) return;
+
+        const videoRoom = global.videoRooms[room];
+
+        socket.leave(room);
+
+        if (videoRoom.hostId === socket.id) {
+            if (videoRoom.peerId) {
+                io.to(videoRoom.peerId).emit('video-peer-left');
+            }
+
+            videoRoom.hostId = null;
+            videoRoom.peerId = null;
+        } else if (videoRoom.peerId === socket.id) {
+            if (videoRoom.hostId) {
+                io.to(videoRoom.hostId).emit('video-peer-left');
+            }
+
+            videoRoom.peerId = null;
+        }
+
+        // حذف الغرفة عندما تصبح فارغة
+        if (!videoRoom.hostId && !videoRoom.peerId) {
+            delete global.videoRooms[room];
+        }
+
+        console.log(`🎥 خروج من غرفة الفيديو ${room}: ${socket.id}`);
+    });
+
+    // تمرير WebRTC Offer
+    socket.on('video-webrtc-offer', (data) => {
+        if (!data?.to || !data?.offer) return;
+
+        io.to(data.to).emit('video-webrtc-offer', {
+            from: socket.id,
+            offer: data.offer,
+        });
+    });
+
+    // تمرير WebRTC Answer
+    socket.on('video-webrtc-answer', (data) => {
+        if (!data?.to || !data?.answer) return;
+
+        io.to(data.to).emit('video-webrtc-answer', {
+            from: socket.id,
+            answer: data.answer,
+        });
+    });
+
+    // تمرير ICE Candidate
+    socket.on('video-webrtc-ice-candidate', (data) => {
+        if (!data?.to || !data?.candidate) return;
+
+        io.to(data.to).emit('video-webrtc-ice-candidate', {
+            from: socket.id,
+            candidate: data.candidate,
+        });
     });
 
     // === قطع الاتصال ===

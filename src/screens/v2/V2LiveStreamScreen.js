@@ -1,218 +1,942 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Vibration } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Vibration,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RTCPeerConnection, RTCView, mediaDevices } from 'react-native-webrtc';
+import {
+  RTCPeerConnection,
+  RTCView,
+  mediaDevices,
+} from 'react-native-webrtc';
 import { getSocket } from '../../api/socket';
 
-const C = { bg:'#0B1120', surface:'#161F2E', elevated:'#1E2A3D', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', danger:'#EF4444', live:'#A855F7', liveBg:'#2A1B3D' };
-const ROOM = 'rabahdj-main';
-const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+const C = {
+  bg: '#05070B',
+  surface: '#111827',
+  primary: '#3B82F6',
+  text: '#FFFFFF',
+  sub: '#94A3B8',
+  danger: '#EF4444',
+  green: '#22C55E',
+};
+
+const ROOM = 'rabahdj-video-main';
+
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+  ],
+};
 
 export default function V2LiveStreamScreen({ navigation }) {
-  const sock = useRef(getSocket());
-  const peersRef = useRef({});      // للمذيع: { viewerId: RTCPeerConnection }
-  const pcRef = useRef(null);       // للمشاهد: اتصال وحيد بالمذيع
+  const socketRef = useRef(getSocket());
+  const pcRef = useRef(null);
   const localStreamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
+  const peerIdRef = useRef(null);
+  const roleRef = useRef(null);
+  const pendingIceRef = useRef([]);
+  const mountedRef = useRef(true);
 
-  const [role, setRole] = useState(null); // null | 'broadcaster' | 'viewer'
+  const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
-  const [live, setLive] = useState(false);
-  const [broadcasterName, setBroadcasterName] = useState('');
+  const [connected, setConnected] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [roomFull, setRoomFull] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
   const [toast, setToast] = useState('');
-  const tT = useRef(null);
-  const flash = (m) => { setToast(m); clearTimeout(tT.current); tT.current = setTimeout(() => setToast(''), 2200); };
 
-  useEffect(() => {
-    const s = sock.current;
-    const onRadioState = (d) => { setLive(!!d.active); setBroadcasterName(d.broadcaster || ''); };
-    s.on('radio_state_change', onRadioState);
-    return () => s.off('radio_state_change', onRadioState);
+  const toastTimer = useRef(null);
+
+  const flash = useCallback((message) => {
+    setToast(message);
+
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+    }
+
+    toastTimer.current = setTimeout(() => {
+      if (mountedRef.current) {
+        setToast('');
+      }
+    }, 2500);
+  }, []);
+
+  const closePeer = useCallback(() => {
+    if (pcRef.current) {
+      try {
+        pcRef.current.onicecandidate = null;
+        pcRef.current.ontrack = null;
+        pcRef.current.onconnectionstatechange = null;
+        pcRef.current.close();
+      } catch (_) {}
+
+      pcRef.current = null;
+    }
+
+    peerIdRef.current = null;
+  }, []);
+
+  const stopLocalStream = useCallback(() => {
+    if (localStreamRef.current) {
+      try {
+        localStreamRef.current.getTracks().forEach((track) => {
+          track.stop();
+        });
+      } catch (_) {}
+
+      localStreamRef.current = null;
+    }
+
+    setLocalStream(null);
   }, []);
 
   const cleanup = useCallback(() => {
-    Object.values(peersRef.current).forEach((pc) => pc.close());
-    peersRef.current = {};
-    if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
-      localStreamRef.current = null;
-    }
+    closePeer();
+    stopLocalStream();
+
+    remoteStreamRef.current = null;
+    pendingIceRef.current = [];
     setRemoteStream(null);
+
+    setConnected(false);
+    setJoining(false);
+    setRoomFull(false);
+  }, [closePeer, stopLocalStream]);
+
+  const createPeerConnection = useCallback((targetId) => {
+    const socket = socketRef.current;
+
+    closePeer();
+    pendingIceRef.current = [];
+
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+
+    pcRef.current = pc;
+    peerIdRef.current = targetId;
+
+    const stream = localStreamRef.current;
+
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
+      });
+    }
+
+    pc.onicecandidate = (event) => {
+      if (!event.candidate || !peerIdRef.current) return;
+
+      socket.emit('video-webrtc-ice-candidate', {
+        to: peerIdRef.current,
+        candidate: event.candidate,
+      });
+    };
+
+    pc.ontrack = (event) => {
+      const streamFromEvent =
+        event.streams && event.streams[0];
+
+      if (!streamFromEvent) return;
+
+      remoteStreamRef.current = streamFromEvent;
+
+      if (mountedRef.current) {
+        setRemoteStream(streamFromEvent);
+        setConnected(true);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+
+      console.log('🎥 WebRTC state:', state);
+
+      if (state === 'connected') {
+        if (mountedRef.current) {
+          setConnected(true);
+          setJoining(false);
+        }
+
+        flash('🟢 تم الاتصال بالفيديو');
+      }
+
+      if (
+        state === 'failed' ||
+        state === 'disconnected' ||
+        state === 'closed'
+      ) {
+        if (mountedRef.current) {
+          setConnected(false);
+        }
+      }
+    };
+
+    return pc;
+  }, [closePeer, flash]);
+
+  const startOffer = useCallback(async (targetId) => {
+    try {
+      const pc = createPeerConnection(targetId);
+
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+
+      await pc.setLocalDescription(offer);
+
+      socketRef.current.emit('video-webrtc-offer', {
+        to: targetId,
+        offer: pc.localDescription,
+      });
+    } catch (error) {
+      console.error('خطأ في إنشاء Offer:', error);
+      flash('⚠️ تعذر إنشاء اتصال الفيديو');
+    }
+  }, [createPeerConnection, flash]);
+
+  const handleOffer = useCallback(async ({ from, offer }) => {
+    try {
+      if (!from || !offer) return;
+
+      const pc = createPeerConnection(from);
+
+      await pc.setRemoteDescription(offer);
+
+      // معالجة ICE الذي وصل قبل Remote Description
+      const pending = pendingIceRef.current;
+      pendingIceRef.current = [];
+
+      for (const candidate of pending) {
+        try {
+          await pc.addIceCandidate(candidate);
+        } catch (error) {
+          console.log('ICE pending تجاهل:', error?.message || error);
+        }
+      }
+
+      const answer = await pc.createAnswer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+
+      await pc.setLocalDescription(answer);
+
+      socketRef.current.emit('video-webrtc-answer', {
+        to: from,
+        answer: pc.localDescription,
+      });
+    } catch (error) {
+      console.error('خطأ في معالجة Offer:', error);
+      flash('⚠️ تعذر استقبال اتصال الفيديو');
+    }
+  }, [createPeerConnection, flash]);
+
+  const handleAnswer = useCallback(async ({ from, answer }) => {
+    try {
+      if (!answer || !pcRef.current) return;
+
+      if (
+        peerIdRef.current &&
+        from !== peerIdRef.current
+      ) {
+        return;
+      }
+
+      await pcRef.current.setRemoteDescription(answer);
+    } catch (error) {
+      console.error('خطأ في Answer:', error);
+    }
   }, []);
 
-  useEffect(() => () => {
-    sock.current.emit('leave-stream-room', { room: ROOM });
+  const handleIce = useCallback(async ({ from, candidate }) => {
+    try {
+      if (!candidate) return;
+
+      if (
+        peerIdRef.current &&
+        from !== peerIdRef.current
+      ) {
+        return;
+      }
+
+      const pc = pcRef.current;
+
+      // ICE وصل قبل إنشاء PeerConnection
+      if (!pc) {
+        pendingIceRef.current.push(candidate);
+        return;
+      }
+
+      // ICE وصل قبل Remote Description
+      if (!pc.remoteDescription) {
+        pendingIceRef.current.push(candidate);
+        return;
+      }
+
+      await pc.addIceCandidate(candidate);
+    } catch (error) {
+      console.log('ICE تجاهل:', error?.message || error);
+    }
+  }, []);
+
+  const handlePeerJoined = useCallback(({ peerId }) => {
+    if (!peerId) return;
+
+    peerIdRef.current = peerId;
+
+    // الطرف الأول هو الذي يبدأ Offer.
+    if (roleRef.current === 'host') {
+      flash('👤 انضم الطرف الآخر...');
+
+      startOffer(peerId);
+    }
+  }, [flash, startOffer]);
+
+  const handlePeerLeft = useCallback(() => {
+    closePeer();
+
+    remoteStreamRef.current = null;
+
+    if (mountedRef.current) {
+      setRemoteStream(null);
+      setConnected(false);
+    }
+
+    flash('📴 الطرف الآخر غادر المكالمة');
+  }, [closePeer, flash]);
+
+  const handleRoomJoined = useCallback(({ role, peerId }) => {
+    roleRef.current = role;
+
+    if (peerId) {
+      peerIdRef.current = peerId;
+
+      // إذا دخلنا والغرفة فيها طرف آخر،
+      // الطرف الجديد ينتظر Offer من المضيف.
+      if (role === 'peer') {
+        flash('📡 جاري الاتصال بالطرف الآخر...');
+      }
+    } else {
+      flash('🟢 دخلت غرفة الفيديو، في انتظار الطرف الآخر');
+    }
+  }, [flash]);
+
+  const leaveRoom = useCallback(() => {
+    try {
+      socketRef.current.emit('leave-video-room', {
+        room: ROOM,
+      });
+    } catch (_) {}
+
     cleanup();
+    roleRef.current = null;
   }, [cleanup]);
 
-  // ===== دور المذيع =====
-  const startBroadcast = async () => {
+  const joinRoom = useCallback(async () => {
+    if (joining || roleRef.current) return;
+
+    setJoining(true);
+    setRoomFull(false);
+
     try {
-      const stream = await mediaDevices.getUserMedia({ audio: true, video: { facingMode: 'user' } });
-      localStreamRef.current = stream;
-      setRole('broadcaster');
-      setRemoteStream(stream); // نعرض معاينة الكاميرا لنفسه
+      const permissionStream =
+        await mediaDevices.getUserMedia({
+          audio: true,
+          video: {
+            facingMode: 'user',
+          },
+        });
 
-      const s = sock.current;
-      s.emit('join-stream-room', { room: ROOM, role: 'broadcaster' });
-      s.emit('start_broadcast');
+      localStreamRef.current = permissionStream;
+      setLocalStream(permissionStream);
 
-      const onViewerJoined = async ({ viewerId }) => {
-        const pc = new RTCPeerConnection(RTC_CONFIG);
-        peersRef.current[viewerId] = pc;
-        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-        pc.onicecandidate = (e) => { if (e.candidate) s.emit('webrtc-ice-candidate', { to: viewerId, candidate: e.candidate }); };
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        s.emit('webrtc-offer', { to: viewerId, offer });
-      };
-      const onAnswer = async ({ from, answer }) => {
-        const pc = peersRef.current[from];
-        if (pc) await pc.setRemoteDescription(answer);
-      };
-      const onIce = async ({ from, candidate }) => {
-        const pc = peersRef.current[from];
-        if (pc && candidate) await pc.addIceCandidate(candidate).catch(() => {});
-      };
+      socketRef.current.emit('join-video-room', {
+        room: ROOM,
+      });
 
-      s.on('viewer-joined', onViewerJoined);
-      s.on('webrtc-answer', onAnswer);
-      s.on('webrtc-ice-candidate', onIce);
       Vibration.vibrate(30);
-      flash('🔴 البث بدأ');
-    } catch (err) {
-      flash('⚠️ تعذّر الوصول للكاميرا/المايكروفون');
+    } catch (error) {
+      console.error('getUserMedia error:', error);
+
+      setJoining(false);
+
+      flash(
+        '⚠️ تعذر الوصول إلى الكاميرا أو الميكروفون'
+      );
     }
-  };
+  }, [joining, flash]);
 
-  const stopBroadcast = () => {
-    const s = sock.current;
-    s.emit('stop_broadcast');
-    s.emit('leave-stream-room', { room: ROOM });
-    s.off('viewer-joined'); s.off('webrtc-answer'); s.off('webrtc-ice-candidate');
-    cleanup();
-    setRole(null);
-    Vibration.vibrate(20);
-    flash('⏹️ تم إنهاء البث');
-  };
+  const toggleMute = useCallback(() => {
+    const stream = localStreamRef.current;
 
-  // ===== دور المشاهد =====
-  const joinAsViewer = () => {
-    setRole('viewer');
-    const s = sock.current;
-    const pc = new RTCPeerConnection(RTC_CONFIG);
-    pcRef.current = pc;
+    if (!stream) return;
 
-    pc.onicecandidate = (e) => { if (e.candidate) s.emit('webrtc-ice-candidate', { to: null, candidate: e.candidate }); };
-    pc.ontrack = (e) => setRemoteStream(e.streams[0]);
+    const nextMuted = !muted;
 
-    const onOffer = async ({ from, offer }) => {
-      await pc.setRemoteDescription(offer);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      s.emit('webrtc-answer', { to: from, answer });
-      pc.onicecandidate = (e) => { if (e.candidate) s.emit('webrtc-ice-candidate', { to: from, candidate: e.candidate }); };
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = !nextMuted;
+    });
+
+    setMuted(nextMuted);
+  }, [muted]);
+
+  const toggleCamera = useCallback(() => {
+    const stream = localStreamRef.current;
+
+    if (!stream) return;
+
+    const nextOff = !cameraOff;
+
+    stream.getVideoTracks().forEach((track) => {
+      track.enabled = !nextOff;
+    });
+
+    setCameraOff(nextOff);
+  }, [cameraOff]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    const socket = socketRef.current;
+
+    socket.on('video-room-joined', handleRoomJoined);
+    socket.on('video-peer-joined', handlePeerJoined);
+    socket.on('video-peer-left', handlePeerLeft);
+    socket.on('video-room-full', () => {
+      setRoomFull(true);
+      setJoining(false);
+      flash('🚫 غرفة الفيديو ممتلئة، يوجد طرفان بالفعل');
+
+      stopLocalStream();
+    });
+
+    socket.on('video-webrtc-offer', handleOffer);
+    socket.on('video-webrtc-answer', handleAnswer);
+    socket.on('video-webrtc-ice-candidate', handleIce);
+
+    return () => {
+      mountedRef.current = false;
+
+      socket.off('video-room-joined', handleRoomJoined);
+      socket.off('video-peer-joined', handlePeerJoined);
+      socket.off('video-peer-left', handlePeerLeft);
+      socket.off('video-room-full');
+
+      socket.off('video-webrtc-offer', handleOffer);
+      socket.off('video-webrtc-answer', handleAnswer);
+      socket.off(
+        'video-webrtc-ice-candidate',
+        handleIce
+      );
+
+      try {
+        socket.emit('leave-video-room', {
+          room: ROOM,
+        });
+      } catch (_) {}
+
+      cleanup();
+
+      if (toastTimer.current) {
+        clearTimeout(toastTimer.current);
+      }
+
+      roleRef.current = null;
     };
-    const onIce = async ({ candidate }) => { if (candidate) await pc.addIceCandidate(candidate).catch(() => {}); };
-    const onEnded = () => { flash('📴 انتهى البث'); leaveAsViewer(); };
-
-    s.on('webrtc-offer', onOffer);
-    s.on('webrtc-ice-candidate', onIce);
-    s.on('stream-ended', onEnded);
-    s.emit('join-stream-room', { room: ROOM, role: 'viewer' });
-    flash('📡 جاري الاتصال بالبث...');
-  };
-
-  const leaveAsViewer = () => {
-    const s = sock.current;
-    s.emit('leave-stream-room', { room: ROOM });
-    s.off('webrtc-offer'); s.off('webrtc-ice-candidate'); s.off('stream-ended');
-    cleanup();
-    setRole(null);
-  };
+  }, [
+    cleanup,
+    flash,
+    handleAnswer,
+    handleIce,
+    handleOffer,
+    handlePeerJoined,
+    handlePeerLeft,
+    handleRoomJoined,
+    stopLocalStream,
+  ]);
 
   const exit = () => {
-    if (role === 'broadcaster') stopBroadcast();
-    else if (role === 'viewer') leaveAsViewer();
+    leaveRoom();
     navigation.goBack();
   };
 
-  // ===== شاشة الاختيار (قبل الدخول بأي دور) =====
-  if (!role) {
+  // ============================================
+  // شاشة البداية
+  // ============================================
+
+  if (!localStream) {
     return (
-      <SafeAreaView style={st.safe}>
-        <View style={st.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="arrow-forward" size={24} color={C.sub} /></TouchableOpacity>
-          <Text style={st.hTitle}>البث المباشر</Text>
-          <View style={{ width:24 }} />
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.iconButton}
+          >
+            <Ionicons
+              name="arrow-forward"
+              size={24}
+              color={C.sub}
+            />
+          </TouchableOpacity>
+
+          <Text style={styles.title}>
+            مكالمة فيديو
+          </Text>
+
+          <View style={{ width: 44 }} />
         </View>
-        <View style={st.center}>
-          <View style={st.liveIcon}><Ionicons name="videocam" size={54} color={C.live} /></View>
-          {live ? (
-            <>
-              <Text style={st.statusTxt}>🔴 {broadcasterName || 'أحدهم'} يبثّ الآن</Text>
-              <TouchableOpacity style={st.btn} onPress={joinAsViewer}>
-                <Ionicons name="eye" size={20} color="#fff" style={{ marginLeft:8 }} />
-                <Text style={st.btnTxt}>مشاهدة البث</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={st.statusTxt}>لا يوجد بث حاليًا</Text>
-              <TouchableOpacity style={[st.btn, { backgroundColor:C.live }]} onPress={startBroadcast}>
-                <Ionicons name="radio" size={20} color="#fff" style={{ marginLeft:8 }} />
-                <Text style={st.btnTxt}>ابدأ البث الآن</Text>
-              </TouchableOpacity>
-            </>
+
+        <View style={styles.startContainer}>
+          <View style={styles.videoIcon}>
+            <Ionicons
+              name="videocam"
+              size={58}
+              color={C.primary}
+            />
+          </View>
+
+          <Text style={styles.bigTitle}>
+            فيديو مباشر ذهاب وإياب
+          </Text>
+
+          <Text style={styles.description}>
+            شغّل الكاميرا والمايك وتحدث مع الطرف الآخر
+            بالصوت والصورة في نفس الوقت.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={joinRoom}
+            disabled={joining}
+          >
+            <Ionicons
+              name="videocam"
+              size={22}
+              color="#fff"
+              style={{ marginLeft: 8 }}
+            />
+
+            <Text style={styles.startButtonText}>
+              {joining
+                ? 'جاري الدخول...'
+                : 'ابدأ مكالمة فيديو'}
+            </Text>
+          </TouchableOpacity>
+
+          {roomFull && (
+            <Text style={styles.errorText}>
+              الغرفة ممتلئة حاليًا.
+            </Text>
           )}
         </View>
-        {!!toast && <View style={st.toast}><Text style={st.toastTxt}>{toast}</Text></View>}
+
+        {!!toast && (
+          <View style={styles.toast}>
+            <Text style={styles.toastText}>
+              {toast}
+            </Text>
+          </View>
+        )}
       </SafeAreaView>
     );
   }
 
-  // ===== شاشة البث الفعلية (مذيع أو مشاهد) =====
+  // ============================================
+  // شاشة المكالمة
+  // ============================================
+
   return (
-    <SafeAreaView style={st.safeVideo}>
+    <SafeAreaView style={styles.callScreen}>
+      {/* الشاشة الكبيرة = الطرف الآخر */}
       {remoteStream ? (
-        <RTCView streamURL={remoteStream.toURL()} style={st.video} objectFit="cover" mirror={role === 'broadcaster'} />
+        <RTCView
+          streamURL={remoteStream.toURL()}
+          style={styles.remoteVideo}
+          objectFit="cover"
+        />
       ) : (
-        <View style={[st.video, st.videoLoading]}><Text style={st.statusTxt}>⏳ جاري الاتصال...</Text></View>
+        <View style={styles.waiting}>
+          <View style={styles.waitingIcon}>
+            <Ionicons
+              name="person"
+              size={52}
+              color={C.sub}
+            />
+          </View>
+
+          <Text style={styles.waitingTitle}>
+            {connected
+              ? 'جاري تشغيل الفيديو...'
+              : 'في انتظار الطرف الآخر'}
+          </Text>
+
+          <Text style={styles.waitingSub}>
+            أرسل للطرف الآخر الدخول إلى نفس غرفة الفيديو
+          </Text>
+        </View>
       )}
-      <View style={st.overlayTop}>
-        <View style={st.liveBadge}><View style={st.liveDot} /><Text style={st.liveBadgeTxt}>{role === 'broadcaster' ? 'أنت تبثّ' : 'مشاهدة'}</Text></View>
+
+      {/* الشاشة الصغيرة = الكاميرا الخاصة بك */}
+      <View style={styles.localContainer}>
+        <RTCView
+          streamURL={localStream.toURL()}
+          style={styles.localVideo}
+          objectFit="cover"
+          mirror
+        />
+
+        {cameraOff && (
+          <View style={styles.cameraOffOverlay}>
+            <Ionicons
+              name="videocam-off"
+              size={28}
+              color="#fff"
+            />
+          </View>
+        )}
+
+        <View style={styles.youBadge}>
+          <Text style={styles.youBadgeText}>
+            أنت
+          </Text>
+        </View>
       </View>
-      <View style={st.overlayBottom}>
-        <TouchableOpacity style={st.exitBtn} onPress={exit}>
-          <Ionicons name={role === 'broadcaster' ? 'stop-circle' : 'close-circle'} size={22} color="#fff" />
-          <Text style={st.exitTxt}>{role === 'broadcaster' ? 'إنهاء البث' : 'مغادرة'}</Text>
+
+      {/* حالة الاتصال */}
+      <View style={styles.connectionBadge}>
+        <View
+          style={[
+            styles.connectionDot,
+            {
+              backgroundColor: connected
+                ? C.green
+                : '#F59E0B',
+            },
+          ]}
+        />
+
+        <Text style={styles.connectionText}>
+          {connected
+            ? 'متصل'
+            : 'جاري الاتصال'}
+        </Text>
+      </View>
+
+      {/* أزرار التحكم */}
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={[
+            styles.controlButton,
+            muted && styles.controlButtonActive,
+          ]}
+          onPress={toggleMute}
+        >
+          <Ionicons
+            name={
+              muted
+                ? 'mic-off'
+                : 'mic'
+            }
+            size={25}
+            color="#fff"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.controlButton,
+            cameraOff && styles.controlButtonActive,
+          ]}
+          onPress={toggleCamera}
+        >
+          <Ionicons
+            name={
+              cameraOff
+                ? 'videocam-off'
+                : 'videocam'
+            }
+            size={25}
+            color="#fff"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.endButton}
+          onPress={exit}
+        >
+          <Ionicons
+            name="call"
+            size={26}
+            color="#fff"
+          />
         </TouchableOpacity>
       </View>
-      {!!toast && <View style={st.toast}><Text style={st.toastTxt}>{toast}</Text></View>}
+
+      {!!toast && (
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>
+            {toast}
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
-const st = StyleSheet.create({
-  safe: { flex:1, backgroundColor:C.bg },
-  safeVideo: { flex:1, backgroundColor:'#000' },
-  header: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:18, paddingVertical:14 },
-  hTitle: { color:C.text, fontSize:18, fontWeight:'800' },
-  center: { flex:1, alignItems:'center', justifyContent:'center', paddingHorizontal:30 },
-  liveIcon: { width:110, height:110, borderRadius:55, backgroundColor:C.liveBg, alignItems:'center', justifyContent:'center', marginBottom:24 },
-  statusTxt: { color:C.text, fontSize:16, fontWeight:'700', marginBottom:24, textAlign:'center' },
-  btn: { flexDirection:'row', backgroundColor:C.primary, height:54, borderRadius:27, paddingHorizontal:28, alignItems:'center', justifyContent:'center' },
-  btnTxt: { color:'#fff', fontSize:16, fontWeight:'700' },
-  video: { flex:1, width:'100%' },
-  videoLoading: { alignItems:'center', justifyContent:'center', backgroundColor:'#111' },
-  overlayTop: { position:'absolute', top:44, left:16 },
-  liveBadge: { flexDirection:'row', alignItems:'center', backgroundColor:'rgba(239,68,68,0.9)', borderRadius:16, paddingHorizontal:12, paddingVertical:6 },
-  liveDot: { width:8, height:8, borderRadius:4, backgroundColor:'#fff', marginLeft:6 },
-  liveBadgeTxt: { color:'#fff', fontSize:12, fontWeight:'700' },
-  overlayBottom: { position:'absolute', bottom:34, alignSelf:'center' },
-  exitBtn: { flexDirection:'row', alignItems:'center', backgroundColor:'rgba(0,0,0,0.6)', borderRadius:24, paddingHorizontal:20, paddingVertical:12 },
-  exitTxt: { color:'#fff', fontSize:14, fontWeight:'700', marginRight:8 },
-  toast: { position:'absolute', bottom:120, alignSelf:'center', backgroundColor:C.elevated, borderWidth:1, borderColor:C.live, borderRadius:14, paddingHorizontal:18, paddingVertical:10 },
-  toastTxt: { color:C.text, fontSize:13, fontWeight:'600' },
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+
+  header: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  title: {
+    color: C.text,
+    fontSize: 19,
+    fontWeight: '800',
+  },
+
+  startContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+
+  videoIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#172554',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+
+  bigTitle: {
+    color: C.text,
+    fontSize: 23,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+
+  description: {
+    color: C.sub,
+    fontSize: 15,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+
+  startButton: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: C.primary,
+    paddingHorizontal: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  startButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  errorText: {
+    color: C.danger,
+    marginTop: 18,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  callScreen: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+
+  remoteVideo: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#111',
+  },
+
+  waiting: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 35,
+    backgroundColor: '#080B10',
+  },
+
+  waitingIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#1E293B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
+  },
+
+  waitingTitle: {
+    color: '#fff',
+    fontSize: 19,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+
+  waitingSub: {
+    color: C.sub,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 21,
+  },
+
+  localContainer: {
+    position: 'absolute',
+    top: 18,
+    right: 16,
+    width: 118,
+    height: 170,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#111',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.7)',
+    elevation: 8,
+  },
+
+  localVideo: {
+    width: '100%',
+    height: '100%',
+  },
+
+  cameraOffOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#111827',
+  },
+
+  youBadge: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+
+  youBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  connectionBadge: {
+    position: 'absolute',
+    top: 18,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 16,
+  },
+
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 7,
+  },
+
+  connectionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  controls: {
+    position: 'absolute',
+    bottom: 25,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 18,
+  },
+
+  controlButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(15,23,42,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  controlButtonActive: {
+    backgroundColor: '#475569',
+  },
+
+  endButton: {
+    width: 62,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: C.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '135deg' }],
+  },
+
+  toast: {
+    position: 'absolute',
+    bottom: 105,
+    alignSelf: 'center',
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#475569',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    maxWidth: '88%',
+  },
+
+  toastText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
 });
