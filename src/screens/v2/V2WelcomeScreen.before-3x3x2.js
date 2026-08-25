@@ -44,7 +44,7 @@ function FeatureTile({ f, index }) {
       style={{
         opacity: fade,
         transform: [{ translateY: slide }],
-        width: '31.5%',
+        width: '48%',
       }}
     >
       <TouchableOpacity
