@@ -388,6 +388,7 @@ export default function V2CinemaScreen({ navigation }) {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.categoriesScroll}
           contentContainerStyle={styles.categories}
         >
           {CATEGORIES.map((c) => {
@@ -584,11 +585,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  categoriesScroll: {
+    flexGrow: 0,
+    height: 56,
+  },
+
   categories: {
     flexDirection: 'row-reverse',
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    paddingBottom: 10,
+    alignItems: 'center',
   },
 
   categoryButton: {
