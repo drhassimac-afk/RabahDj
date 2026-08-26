@@ -20,6 +20,8 @@ import {
   Ionicons,
 } from '@expo/vector-icons';
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
@@ -81,12 +83,12 @@ const DEMO_ITEMS = [
 ];
 
 const CATEGORIES = [
-  'الكل',
-  'أفلام',
-  'كوميديا',
-  'مسلسلات',
-  'وثائقي',
-  'المفضلة',
+  { key: 'الكل', icon: 'apps' },
+  { key: 'أفلام', icon: 'film' },
+  { key: 'كوميديا', icon: 'happy' },
+  { key: 'مسلسلات', icon: 'tv' },
+  { key: 'وثائقي', icon: 'globe' },
+  { key: 'المفضلة', icon: 'heart' },
 ];
 
 function getCategory(fileName) {
@@ -370,7 +372,7 @@ export default function V2CinemaScreen({ navigation }) {
             />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>
+          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.2}>
             سينما وتلفاز
           </Text>
 
@@ -388,29 +390,36 @@ export default function V2CinemaScreen({ navigation }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categories}
         >
-          {CATEGORIES.map((itemCategory) => (
-            <TouchableOpacity
-              key={itemCategory}
-              onPress={() =>
-                setCategory(itemCategory)
-              }
-              style={[
-                styles.categoryButton,
-                category === itemCategory &&
-                  styles.categoryButtonActive,
-              ]}
-            >
-              <Text
+          {CATEGORIES.map((c) => {
+            const active = category === c.key;
+            return (
+              <TouchableOpacity
+                key={c.key}
+                onPress={() => setCategory(c.key)}
+                activeOpacity={0.85}
                 style={[
-                  styles.categoryText,
-                  category === itemCategory &&
-                    styles.categoryTextActive,
+                  styles.categoryButton,
+                  active && styles.categoryButtonActive,
                 ]}
               >
-                {itemCategory}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Ionicons
+                  name={active ? c.icon : `${c.icon}-outline`}
+                  size={16}
+                  color={active ? '#FFFFFF' : C.sub}
+                  style={styles.categoryIcon}
+                />
+                <Text
+                  style={[
+                    styles.categoryText,
+                    active && styles.categoryTextActive,
+                  ]}
+                  maxFontSizeMultiplier={1.2}
+                >
+                  {c.key}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
         <View style={styles.infoRow}>
@@ -442,11 +451,16 @@ export default function V2CinemaScreen({ navigation }) {
           columnWrapperStyle={styles.column}
           renderItem={({ item }) => (
             <TouchableOpacity
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               style={styles.card}
               onPress={() => setPlaying(item)}
             >
-              <View style={styles.cardImage}>
+              <LinearGradient
+                colors={[item.color, C.bg]}
+                start={{ x: 0.2, y: 0 }}
+                end={{ x: 0.8, y: 1 }}
+                style={styles.cardImage}
+              >
                 <TouchableOpacity
                   style={styles.favButton}
                   onPress={() => toggleFavorite(item.id)}
@@ -454,20 +468,24 @@ export default function V2CinemaScreen({ navigation }) {
                 >
                   <Ionicons
                     name={favorites.includes(item.id) ? 'heart' : 'heart-outline'}
-                    size={18}
+                    size={16}
                     color={favorites.includes(item.id) ? C.danger : '#FFFFFF'}
                   />
                 </TouchableOpacity>
 
-                <Text style={styles.emoji}>
+                <Text style={styles.genreBadgeEmoji}>
                   {item.emoji}
                 </Text>
+
+                <View style={styles.playCircle}>
+                  <Ionicons name="play" size={20} color="#FFFFFF" />
+                </View>
 
                 {item.remote && (
                   <View style={styles.networkBadge}>
                     <Ionicons
                       name="wifi"
-                      size={13}
+                      size={12}
                       color="#FFFFFF"
                     />
                     <Text style={styles.networkText}>
@@ -475,7 +493,7 @@ export default function V2CinemaScreen({ navigation }) {
                     </Text>
                   </View>
                 )}
-              </View>
+              </LinearGradient>
 
               <View style={styles.cardFooter}>
                 <Text
@@ -574,21 +592,30 @@ const styles = StyleSheet.create({
   },
 
   categoryButton: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
     backgroundColor: C.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginLeft: 6,
+    paddingVertical: 9,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: C.border,
   },
 
   categoryButtonActive: {
     backgroundColor: C.primary,
+    borderColor: C.primary,
+  },
+
+  categoryIcon: {
+    marginLeft: 6,
   },
 
   categoryText: {
     color: C.sub,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   categoryTextActive: {
@@ -658,13 +685,29 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
-  emoji: {
-    fontSize: 54,
+  genreBadgeEmoji: {
+    position: 'absolute',
+    top: 9,
+    left: 9,
+    fontSize: 16,
+    opacity: 0.85,
+  },
+
+  playCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 3,
   },
 
   networkBadge: {
     position: 'absolute',
-    top: 9,
+    bottom: 9,
     left: 9,
     flexDirection: 'row',
     alignItems: 'center',

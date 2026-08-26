@@ -10,6 +10,7 @@ import {
   Vibration,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotifications, subscribe } from '../../api/notifications';
 import { getSocket } from '../../api/socket';
@@ -39,30 +40,49 @@ function FeatureTile({ f, index }) {
     ]).start();
   }, [fade, slide, index]);
 
+  if (f.placeholder) {
+    return <View style={{ width: '31%' }} />;
+  }
+
   return (
     <Animated.View
       style={{
         opacity: fade,
         transform: [{ translateY: slide }],
-        width: '31.5%',
+        width: '31%',
       }}
     >
       <TouchableOpacity
-        style={styles.tile}
+        style={[styles.tile, { borderColor: `${f.color}30` }]}
         onPress={f.onPress}
         activeOpacity={0.88}
       >
-        <View style={[styles.iconWrap, { backgroundColor: f.bg }]}>
-          <Ionicons name={f.icon} size={26} color={f.color} />
+        <View style={styles.iconOuter}>
+          <LinearGradient
+            colors={[f.color, `${f.color}99`]}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={[styles.iconWrap, { shadowColor: f.color }]}
+          >
+            <Ionicons name={f.icon} size={27} color="#FFFFFF" />
+          </LinearGradient>
           {!!f.badge && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>
+              <Text style={styles.badgeText} allowFontScaling={false}>
                 {f.badge > 9 ? '9+' : f.badge}
               </Text>
             </View>
           )}
         </View>
-        <Text style={styles.tileTitle}>{f.label}</Text>
+        <Text
+          style={styles.tileTitle}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.72}
+          maxFontSizeMultiplier={1.15}
+        >
+          {f.label}
+        </Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -153,7 +173,7 @@ export default function V2WelcomeScreen({ navigation }) {
           <Text style={[styles.title, { color: C.primary }]}>Dj</Text>
         </View>
         <View style={styles.titleUnderline} />
-        <Text style={styles.subtitle}>شبكتك الاجتماعية المحلية</Text>
+        <Text style={styles.subtitle} maxFontSizeMultiplier={1.3}>شبكتك الاجتماعية المحلية</Text>
 
         <View style={styles.statusRow}>
           <View
@@ -172,7 +192,7 @@ export default function V2WelcomeScreen({ navigation }) {
           </Text>
         </View>
 
-        <Text style={styles.desc}>
+        <Text style={styles.desc} maxFontSizeMultiplier={1.2}>
           تواصل، شارك، وابثّ صوتاً وفيديو مع أصدقائك عبر شبكتك المحلية بدون إنترنت
         </Text>
 
@@ -180,6 +200,10 @@ export default function V2WelcomeScreen({ navigation }) {
           {FEATURES.map((f, i) => (
             <FeatureTile key={f.label} f={f} index={i} />
           ))}
+          {FEATURES.length % 3 !== 0 &&
+            Array.from({ length: 3 - (FEATURES.length % 3) }).map((_, i) => (
+              <FeatureTile key={`filler-${i}`} f={{ placeholder: true }} index={0} />
+            ))}
         </View>
       </ScrollView>
 
@@ -301,37 +325,45 @@ const styles = StyleSheet.create({
     marginTop: S.xl,
   },
   tile: {
-    width: '31.5%',
+    width: '100%',
     backgroundColor: C.surface,
-    borderRadius: R.md,
-    paddingVertical: S.md,
-    paddingHorizontal: S.sm,
+    borderRadius: R.lg,
+    paddingVertical: S.md + 4,
+    paddingHorizontal: S.xs,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: C.borderSoft,
     marginBottom: S.md,
-    minHeight: 110,
+    minHeight: 116,
     ...SH.card,
   },
+  iconOuter: {
+    position: 'relative',
+    marginBottom: S.sm + 2,
+  },
   iconWrap: {
-    width: 58,
-    height: 58,
-    borderRadius: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: S.sm,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6,
   },
   tileTitle: {
     color: C.text,
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
     textAlign: 'center',
+    lineHeight: 16,
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -6,
+    right: -6,
     backgroundColor: C.danger,
     borderRadius: 10,
     minWidth: 20,
@@ -339,6 +371,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: C.surface,
   },
   badgeText: {
     color: C.white,
