@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ActivityIndicator, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SERVER_URL, discoverServer } from '../../api/config';
+import { initNotifications, setOsNotificationsEnabled, getOsNotificationsEnabled, checkNotificationPermission } from '../../api/notifications';
 
 const C = { bg:'#0B1120', surface:'#161F2E', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', gold:'#FACC15', success:'#22C55E', danger:'#EF4444' };
 
@@ -23,6 +24,8 @@ export default function V2SettingsScreen({ navigation }) {
   const [serverAddr, setServerAddr] = useState(SERVER_URL.replace('http://', ''));
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null); // null | 'success' | 'fail'
+  const [notifOn, setNotifOn] = useState(getOsNotificationsEnabled());
+  const [notifGranted, setNotifGranted] = useState(true);
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(14)).current;
 
@@ -31,6 +34,10 @@ export default function V2SettingsScreen({ navigation }) {
       Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }),
       Animated.spring(slide, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 6 }),
     ]).start();
+    checkNotificationPermission().then((granted) => {
+      setNotifGranted(granted);
+      if (!granted) setNotifOn(false);
+    });
   }, []);
 
   const rescan = async () => {
@@ -45,6 +52,20 @@ export default function V2SettingsScreen({ navigation }) {
       setScanResult('fail');
     }
     setTimeout(() => setScanResult(null), 3000);
+  };
+
+  const toggleNotif = async (value) => {
+    if (value) {
+      const granted = await initNotifications();
+      setNotifGranted(granted);
+      if (!granted) {
+        setNotifOn(false);
+        setOsNotificationsEnabled(false);
+        return;
+      }
+    }
+    setNotifOn(value);
+    setOsNotificationsEnabled(value);
   };
 
   return (
@@ -74,6 +95,26 @@ export default function V2SettingsScreen({ navigation }) {
             {scanning ? 'جاري البحث عن السيرفر...' : scanResult === 'success' ? 'تم العثور على السيرفر ✓' : scanResult === 'fail' ? 'لم يتم العثور على السيرفر' : 'إعادة البحث عن السيرفر'}
           </Text>
         </PressableScale>
+
+        <View style={s.card}>
+          <Ionicons name="notifications-outline" size={22} color={notifOn ? C.primary : C.sub} />
+          <View style={{ marginRight: 12, flex: 1 }}>
+            <Text style={[s.label, { color: C.text, fontWeight: '600' }]}>إشعارات الهاتف</Text>
+            {!notifGranted && (
+              <TouchableOpacity onPress={() => Linking.openSettings()}>
+                <Text style={[s.label, { color: C.danger, marginTop: 2 }]}>
+                  الإذن مرفوض — افتح إعدادات الهاتف لتفعيله
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <Switch
+            value={notifOn}
+            onValueChange={toggleNotif}
+            trackColor={{ false: C.border, true: C.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
 
         <PressableScale style={s.card} onPress={() => navigation.navigate('V2AdminLoginScreen')}>
           <Ionicons name="shield-checkmark-outline" size={22} color={C.gold} />

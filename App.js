@@ -25,6 +25,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { discoverServer } from './src/api/config';
+import { initNotifications } from './src/api/notifications';
 
 import V2WelcomeScreen from './src/screens/v2/V2WelcomeScreen';
 import MainTabs from './src/navigation/MainTabs';
@@ -121,6 +122,7 @@ export default function App() {
 
   useEffect(() => {
     configureAndroidNavigationBar();
+    initNotifications();
     discoverServer().finally(() => setServerReady(true));
   }, []);
 

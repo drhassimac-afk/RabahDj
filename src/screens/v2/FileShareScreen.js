@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { getSocket } from '../../api/socket';
 import { SERVER_URL } from '../../api/config';
+import { addNotification } from '../../api/notifications';
 
 const C = { bg:'#0B1120', surface:'#161F2E', elevated:'#1E2A3D', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', success:'#22C55E', gold:'#FACC15', live:'#A855F7' };
 
@@ -64,7 +65,7 @@ export default function FileShareScreen({ route, navigation }) {
 
   useEffect(() => {
     const s = sock.current;
-    const onFile = (d) => { setFiles(prev => [d, ...prev.filter(x => x.url !== d.url)]); flash('📥 ملف جديد: ' + (d.name||'')); Vibration.vibrate(30); };
+    const onFile = (d) => { setFiles(prev => [d, ...prev.filter(x => x.url !== d.url)]); flash('📥 ملف جديد: ' + (d.name||'')); Vibration.vibrate(30); addNotification('file', `${d.from ? d.from + ' شارك' : 'تمت مشاركة'} ملف: ${d.name || ''}`); };
     s.on('file_shared', onFile);
     fetch(SERVER_URL + '/media-list').then(r => r.json()).then(list => {
       if (Array.isArray(list)) setFiles(list.map(it => ({ name: it.name || it.filename || 'ملف', url: it.url || (SERVER_URL + it.path), size: it.size })).filter(x => x.url));
@@ -150,11 +151,17 @@ export default function FileShareScreen({ route, navigation }) {
       </View>
 
       <View style={st.picks}>
-        <PressableScale style={[st.pick, { backgroundColor:'#152A47' }]} onPress={pickImage}>
-          <Ionicons name="images" size={26} color={C.primary} /><Text style={st.pickTxt}>صورة / فيديو</Text>
+        <PressableScale style={[st.pick, { backgroundColor: '#152A47', borderColor: '#2563EB55' }]} onPress={pickImage}>
+          <View style={[st.pickIcon, { backgroundColor: '#3B82F633' }]}>
+            <Ionicons name="images" size={24} color={C.primary} />
+          </View>
+          <Text style={st.pickTxt} maxFontSizeMultiplier={1.2}>صورة / فيديو</Text>
         </PressableScale>
-        <PressableScale style={[st.pick, { backgroundColor:'#2A1B3D' }]} onPress={pickFile}>
-          <Ionicons name="folder-open" size={26} color={C.live} /><Text style={st.pickTxt}>ملف / تطبيق</Text>
+        <PressableScale style={[st.pick, { backgroundColor: '#2A1B3D', borderColor: '#A855F755' }]} onPress={pickFile}>
+          <View style={[st.pickIcon, { backgroundColor: '#A855F733' }]}>
+            <Ionicons name="folder-open" size={24} color={C.live} />
+          </View>
+          <Text style={st.pickTxt} maxFontSizeMultiplier={1.2}>ملف / تطبيق</Text>
         </PressableScale>
       </View>
 
@@ -169,8 +176,11 @@ export default function FileShareScreen({ route, navigation }) {
       <FlatList data={files} keyExtractor={(it, i) => (it.url || '') + i} renderItem={Row} contentContainerStyle={st.list}
         ListEmptyComponent={
           <View style={st.emptyBox}>
-            <Ionicons name="cloud-upload-outline" size={44} color={C.muted} />
-            <Text style={st.empty}>لا ملفات بعد. اختر صورة أو ملفًا للإرسال 📤</Text>
+            <View style={st.emptyCircle}>
+              <Ionicons name="cloud-upload-outline" size={40} color={C.primary} />
+            </View>
+            <Text style={st.empty} maxFontSizeMultiplier={1.2}>لا ملفات بعد</Text>
+            <Text style={st.emptyHint} maxFontSizeMultiplier={1.2}>اختر صورة أو ملفًا من الأعلى لإرساله للجميع 📤</Text>
           </View>
         } />
 
@@ -193,9 +203,10 @@ const st = StyleSheet.create({
   safe:{flex:1,backgroundColor:C.bg},
   header:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:18,paddingVertical:14},
   hTitle:{color:C.text,fontSize:18,fontWeight:'800'},
-  picks:{flexDirection:'row',paddingHorizontal:16,marginBottom:8},
-  pick:{flex:1,marginHorizontal:6,borderRadius:16,paddingVertical:16,alignItems:'center',borderWidth:1,borderColor:C.border},
-  pickTxt:{color:C.text,fontSize:13,fontWeight:'700',marginTop:8},
+  picks:{flexDirection:'row',paddingHorizontal:16,marginBottom:8,marginTop:4},
+  pick:{flex:1,marginHorizontal:6,borderRadius:18,paddingVertical:20,alignItems:'center',borderWidth:1.5},
+  pickIcon:{width:52,height:52,borderRadius:16,alignItems:'center',justifyContent:'center',marginBottom:10},
+  pickTxt:{color:C.text,fontSize:13.5,fontWeight:'700'},
   progBox:{marginHorizontal:16,marginVertical:6,backgroundColor:C.surface,borderRadius:12,padding:12,borderWidth:1,borderColor:C.border},
   progName:{color:C.text,fontSize:13,marginBottom:6},
   bar:{height:6,borderRadius:3,backgroundColor:C.elevated,overflow:'hidden'},
@@ -203,7 +214,9 @@ const st = StyleSheet.create({
   progPct:{color:C.sub,fontSize:11,marginTop:4,textAlign:'left'},
   list:{padding:16,paddingBottom:30,flexGrow:1},
   emptyBox:{flex:1,alignItems:'center',justifyContent:'center',paddingTop:60},
-  empty:{color:C.muted,textAlign:'center',marginTop:14,fontSize:14},
+  emptyCircle:{width:84,height:84,borderRadius:42,backgroundColor:'#3B82F61A',borderWidth:1,borderColor:'#3B82F640',alignItems:'center',justifyContent:'center',marginBottom:16},
+  empty:{color:C.text,textAlign:'center',fontSize:16,fontWeight:'700'},
+  emptyHint:{color:C.muted,textAlign:'center',marginTop:6,fontSize:13,paddingHorizontal:30},
   row:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:16,padding:12,marginBottom:10,borderWidth:1,borderColor:C.border},
   ficon:{width:44,height:44,borderRadius:12,alignItems:'center',justifyContent:'center'},
   fname:{color:C.text,fontSize:14,fontWeight:'700',marginRight:10},
