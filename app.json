@@ -34,7 +34,10 @@
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_CAMERA",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
       ],
       "versionCode": 8
     },
@@ -71,7 +74,9 @@
       "icon": "./assets/icon.png",
       "color": "#3B82F6"
     }
-  ]
+  ],
+  "@notifee/react-native",
+  "./plugins/withNotifeeForegroundService.js"
 ],
     "extra": {
       "eas": {

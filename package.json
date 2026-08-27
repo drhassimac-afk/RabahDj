@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^13.0.0",
+    "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.18",
@@ -45,6 +46,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@expo/config-plugins": "~54.0.0",
     "@react-native-community/cli": "^20.2.0",
     "babel-preset-expo": "54.0.10"
   },
