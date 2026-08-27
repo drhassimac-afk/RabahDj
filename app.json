@@ -75,7 +75,6 @@
       "color": "#3B82F6"
     }
   ],
-  "@notifee/react-native",
   "./plugins/withNotifeeForegroundService.js"
 ],
     "extra": {
