@@ -560,6 +560,7 @@ export default function V2LiveStreamScreen({ navigation }) {
           streamURL={remoteStream.toURL()}
           style={styles.remoteVideo}
           objectFit="cover"
+          zOrder={0}
         />
       ) : (
         <View style={styles.waiting}>
@@ -584,12 +585,17 @@ export default function V2LiveStreamScreen({ navigation }) {
       )}
 
       {/* الشاشة الصغيرة = الكاميرا الخاصة بك */}
-      <View style={styles.localContainer}>
+      <View
+        style={styles.localContainer}
+        collapsable={false}
+        renderToHardwareTextureAndroid
+      >
         <RTCView
           streamURL={localStream.toURL()}
           style={styles.localVideo}
           objectFit="cover"
           mirror
+          zOrder={1}
         />
 
         {cameraOff && (
