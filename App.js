@@ -26,7 +26,7 @@ import {
 
 import { discoverServer } from './src/api/config';
 import { initNotifications } from './src/api/notifications';
-import { prewarmCallForegroundService } from './src/api/callForegroundService';
+// TEMP TEST: Notifee disabled
 
 import V2WelcomeScreen from './src/screens/v2/V2WelcomeScreen';
 import MainTabs from './src/navigation/MainTabs';
@@ -124,7 +124,7 @@ export default function App() {
   useEffect(() => {
     configureAndroidNavigationBar();
     initNotifications();
-    prewarmCallForegroundService();
+    // TEMP TEST: prewarmCallForegroundService disabled
     discoverServer().finally(() => setServerReady(true));
   }, []);
 
