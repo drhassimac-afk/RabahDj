@@ -49,11 +49,16 @@ jobs:
 
       - name: 🚀 Build Release APK
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
+          # قلّلنا حد الذاكرة لـ Gradle (كان 4096م) وخصّصنا حد ذاكرة واضح لـ Node
+          # المسؤول عن تجميع كود الجافاسكربت (Metro) — بدون هذا التوزيع، Gradle
+          # ياخذ كل الذاكرة المتاحة على عامل GitHub Actions (~7 جيجا) ويترك Node
+          # بدون ذاكرة كافية فينهار بصمت بلا أي رسالة خطأ (OOM) بالضبط بهذه الخطوة.
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2560m -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2"
+          NODE_OPTIONS: "--max-old-space-size=3072"
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon --max-workers=2
 
       - name: 📤 Upload APK as Artifact
         uses: actions/upload-artifact@v5
