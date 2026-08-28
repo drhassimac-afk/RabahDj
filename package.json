@@ -15,12 +15,12 @@
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/stack": "^6.4.1",
-    "expo": "~54.0.0",
+    "expo": "54.0.37",
     "expo-av": "~16.0.8",
     "expo-build-properties": "~1.0.10",
     "expo-dev-client": "~6.0.21",
     "expo-document-picker": "~14.0.8",
-    "expo-file-system": "~19.0.23",
+    "expo-file-system": "19.0.24",
     "expo-image-picker": "~17.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-media-library": "~18.2.1",
@@ -60,5 +60,6 @@
         ]
       }
     }
-  }
+  },
+  "main": "App.js"
 }
