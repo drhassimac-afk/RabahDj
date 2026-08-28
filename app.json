@@ -34,10 +34,7 @@
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_CAMERA",
-        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "versionCode": 8
     },
@@ -74,8 +71,7 @@
       "icon": "./assets/icon.png",
       "color": "#3B82F6"
     }
-  ],
-  "./plugins/withNotifeeForegroundService.js"
+  ]
 ],
     "extra": {
       "eas": {

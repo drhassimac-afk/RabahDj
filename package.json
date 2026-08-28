@@ -10,17 +10,16 @@
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^13.0.0",
-    "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/stack": "^6.4.1",
-    "expo": "54.0.37",
+    "expo": "~54.0.0",
     "expo-av": "~16.0.8",
     "expo-build-properties": "~1.0.10",
     "expo-dev-client": "~6.0.21",
     "expo-document-picker": "~14.0.8",
-    "expo-file-system": "19.0.24",
+    "expo-file-system": "~19.0.23",
     "expo-image-picker": "~17.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-media-library": "~18.2.1",
@@ -48,7 +47,6 @@
     "@babel/core": "^7.20.0",
     "@expo/config-plugins": "~54.0.0",
     "@react-native-community/cli": "^20.2.0",
-    "@react-native/metro-config": "^0.87.1",
     "babel-preset-expo": "54.0.10"
   },
   "private": true,
@@ -60,6 +58,5 @@
         ]
       }
     }
-  },
-  "main": "App.js"
+  }
 }
