@@ -48,6 +48,7 @@
     "@babel/core": "^7.20.0",
     "@expo/config-plugins": "~54.0.0",
     "@react-native-community/cli": "^20.2.0",
+    "@react-native/metro-config": "^0.87.1",
     "babel-preset-expo": "54.0.10"
   },
   "private": true,
