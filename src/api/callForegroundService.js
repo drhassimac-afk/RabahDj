@@ -13,12 +13,28 @@ import { Platform } from 'react-native';
 let channelId = null;
 let running = false;
 
-export async function startCallForegroundService() {
-  if (Platform.OS !== 'android' || running) return;
+export async function prewarmCallForegroundService() {
+  if (Platform.OS !== 'android') return;
 
   try {
     await notifee.requestPermission();
 
+    if (!channelId) {
+      channelId = await notifee.createChannel({
+        id: 'video-call',
+        name: 'مكالمة فيديو نشطة',
+        importance: AndroidImportance.LOW,
+      });
+    }
+  } catch (e) {
+    // تجاهل بصمت
+  }
+}
+
+export async function startCallForegroundService() {
+  if (Platform.OS !== 'android' || running) return;
+
+  try {
     if (!channelId) {
       channelId = await notifee.createChannel({
         id: 'video-call',
