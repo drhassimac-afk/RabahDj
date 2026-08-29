@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Vibration, FlatList, Animated
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getSocket } from '../../api/socket';
 
 const C = { bg:'#0B1120', surface:'#161F2E', elevated:'#1E2A3D', border:'#243044', primary:'#3B82F6', text:'#FFFFFF', sub:'#94A3B8', muted:'#64748B', danger:'#EF4444', gold:'#FACC15', walkie:'#14B8A6', walkieBg:'#0F3B36' };
