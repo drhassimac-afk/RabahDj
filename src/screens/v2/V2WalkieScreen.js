@@ -112,7 +112,10 @@ export default function V2WalkieScreen({ navigation }) {
       sock.current.emit('walkie_audio', { audioBase64, duration });
       Vibration.vibrate(20);
       flash('✅ تم الإرسال');
-    } catch (err) { flash('⚠️ خطأ أثناء الإرسال'); }
+    } catch (err) {
+      console.log('خطأ الإرسال:', err?.message || err);
+      flash('⚠️ خطأ أثناء الإرسال: ' + (err?.message || 'غير معروف'));
+    }
   };
 
   const Row = ({ item }) => (
