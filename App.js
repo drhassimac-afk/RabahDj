@@ -25,7 +25,6 @@ import {
 } from 'react-native-safe-area-context';
 
 import { discoverServer } from './src/api/config';
-import { prewarmCallForegroundService } from './src/api/callForegroundService';
 import { initNotifications } from './src/api/notifications';
 
 
@@ -125,7 +124,6 @@ export default function App() {
   useEffect(() => {
     configureAndroidNavigationBar();
     initNotifications();
-    prewarmCallForegroundService();
     discoverServer().finally(() => setServerReady(true));
   }, []);
 
