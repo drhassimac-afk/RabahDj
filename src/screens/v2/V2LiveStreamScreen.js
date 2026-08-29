@@ -14,6 +14,10 @@ import {
   mediaDevices,
 } from 'react-native-webrtc';
 import { getSocket } from '../../api/socket';
+import {
+  startCallForegroundService,
+  stopCallForegroundService,
+} from '../../../modules/foreground-call-service';
 
 const C = {
   bg: '#05070B',
@@ -100,6 +104,7 @@ export default function V2LiveStreamScreen({ navigation }) {
   const cleanup = useCallback(() => {
     closePeer();
     stopLocalStream();
+    stopCallForegroundService();
 
     remoteStreamRef.current = null;
     pendingIceRef.current = [];
@@ -361,6 +366,8 @@ export default function V2LiveStreamScreen({ navigation }) {
         room: ROOM,
       });
 
+      startCallForegroundService();
+
       Vibration.vibrate(30);
     } catch (error) {
       console.error('getUserMedia error:', error);
@@ -415,6 +422,7 @@ export default function V2LiveStreamScreen({ navigation }) {
       flash('🚫 غرفة الفيديو ممتلئة، يوجد طرفان بالفعل');
 
       stopLocalStream();
+      stopCallForegroundService();
     });
 
     socket.on('video-webrtc-offer', handleOffer);

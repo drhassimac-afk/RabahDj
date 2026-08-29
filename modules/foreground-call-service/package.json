@@ -1,0 +1,7 @@
+{
+  "name": "foreground-call-service",
+  "version": "1.0.0",
+  "description": "Local minimal Android foreground service to keep the video call camera/mic alive when the app is backgrounded",
+  "main": "index.js",
+  "platforms": ["android"]
+}
