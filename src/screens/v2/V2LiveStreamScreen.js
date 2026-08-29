@@ -585,17 +585,14 @@ export default function V2LiveStreamScreen({ navigation }) {
       )}
 
       {/* الشاشة الصغيرة = الكاميرا الخاصة بك */}
-      <View
-        style={styles.localContainer}
-        collapsable={false}
-        renderToHardwareTextureAndroid
-      >
+      <View style={styles.localContainer}>
         <RTCView
+          key={localStream.id}
           streamURL={localStream.toURL()}
           style={styles.localVideo}
           objectFit="cover"
           mirror
-          zOrder={1}
+          zOrder={2}
         />
 
         {cameraOff && (
